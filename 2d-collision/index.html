@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Momentum Conservation Simulation</title>
+    <!-- p5.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #1a202c; color: white; touch-action: none; }
+        canvas { display: block; margin: 0 auto; }
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: auto;
+            max-width: 300px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        input[type=number] {
+            color: black;
+            padding: 2px 4px;
+            border-radius: 4px;
+            width: 60px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- UI Controls -->
+    <div class="controls font-sans text-sm">
+        <h1 class="text-lg font-bold mb-2">運動量保存則シミュレーション</h1>
+        <p class="text-xs text-gray-300 mb-3">壁反射なし・画面外でリセット</p>
+        
+        <!-- Controls for Ball 1 -->
+        <div class="mb-3 border-l-4 border-gray-100 pl-2">
+            <h2 class="font-bold text-white mb-1">⚪ 白ボール (左上から)</h2>
+            <div class="grid grid-cols-2 gap-2 mb-1">
+                <div>
+                    <label class="block text-xs text-gray-400">速度 X</label>
+                    <input type="number" id="b1_vx" step="0.1">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400">速度 Y</label>
+                    <input type="number" id="b1_vy" step="0.1">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400">質量 (Mass)</label>
+                <input type="number" id="b1_m" value="3" min="1" max="10" class="w-full">
+            </div>
+        </div>
+
+        <!-- Controls for Ball 2 -->
+        <div class="mb-4 border-l-4 border-red-500 pl-2">
+            <h2 class="font-bold text-red-400 mb-1">🔴 赤ボール (左下から)</h2>
+            <div class="grid grid-cols-2 gap-2 mb-1">
+                <div>
+                    <label class="block text-xs text-gray-400">速度 X</label>
+                    <input type="number" id="b2_vx" step="0.1">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400">速度 Y</label>
+                    <input type="number" id="b2_vy" step="0.1">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400">質量 (Mass)</label>
+                <input type="number" id="b2_m" value="3" min="1" max="10" class="w-full">
+            </div>
+        </div>
+
+        <div class="flex space-x-2 mb-2">
+            <button id="toggleBtn" onclick="toggleSimulation()" class="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded w-full">
+                スタート
+            </button>
+            <button onclick="resetSimulation()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded w-full">
+                適用/リセット
+            </button>
+        </div>
+
+        <!-- Checkbox for Momentum Vector -->
+        <div class="mt-2 pt-2 border-t border-gray-600 space-y-2">
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+                <input type="checkbox" id="showMomentum" checked class="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 border-gray-300">
+                <span class="text-xs font-bold text-gray-300 ml-2">個別の運動量 ($m\vec{v}$)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+                <input type="checkbox" id="showTotalMomentum" checked class="form-checkbox h-4 w-4 text-pink-600 rounded focus:ring-pink-500 border-gray-300">
+                <span class="text-xs font-bold text-yellow-300 ml-2">総運動量と成分 (平行四辺形)</span>
+            </label>
+            <!-- New Checkboxes for Momentum Change -->
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+                <input type="checkbox" id="showDeltaP1" class="form-checkbox h-4 w-4 text-gray-200 rounded focus:ring-gray-400 border-gray-300">
+                <span class="text-xs font-bold text-white ml-2">白の運動量変化 ($\Delta \vec{p}_1$)</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer select-none">
+                <input type="checkbox" id="showDeltaP2" class="form-checkbox h-4 w-4 text-red-600 rounded focus:ring-red-500 border-gray-300">
+                <span class="text-xs font-bold text-red-400 ml-2">赤の運動量変化 ($\Delta \vec{p}_2$)</span>
+            </label>
+        </div>
+        
+        <div class="text-xs text-gray-400 mt-2">
+            <p>総運動量 P = <span id="totalP" class="font-mono text-white">0.00</span></p>
+            <p>総エネルギー E = <span id="totalE" class="font-mono text-white">0.00</span></p>
+        </div>
+    </div>
+
+    <script>
+        let balls = [];
+        let isRunning = false;
+        let dragBall = null;
+        let initialMomentum = null; 
+        let hasCollided = false; // 衝突が発生したかどうかのフラグ
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            setOptimalVelocities();
+            resetSimulation();
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            if (!isRunning) {
+                setOptimalVelocities();
+                resetSimulation();
+            }
+        }
+
+        function setOptimalVelocities() {
+            let targetX = width * 0.35;
+            let targetY = height * 0.5;
+            let startX = width * 0.1;
+            let startY1 = height * 0.2;
+            let startY2 = height * 0.8;
+            let baseVy = 3.0;
+
+            let dy1 = targetY - startY1;
+            let dx1 = targetX - startX;
+            let vx1 = baseVy * (dx1 / dy1);
+
+            let dy2 = targetY - startY2;
+            let dx2 = targetX - startX;
+            let vx2 = (-baseVy) * (dx2 / dy2);
+
+            document.getElementById('b1_vx').value = vx1.toFixed(2);
+            document.getElementById('b1_vy').value = baseVy.toFixed(2);
+            document.getElementById('b2_vx').value = vx2.toFixed(2);
+            document.getElementById('b2_vy').value = (-baseVy).toFixed(2);
+        }
+
+        function toggleSimulation() {
+            isRunning = !isRunning;
+            updateButtonState();
+            
+            if (isRunning) {
+                initialMomentum = calculateTotalMomentum();
+                // スタート時の各ボールの速度を記録（変化量計算用）
+                for (let b of balls) {
+                    b.startVel = b.vel.copy();
+                }
+            }
+        }
+
+        function updateButtonState() {
+            const btn = document.getElementById('toggleBtn');
+            if (isRunning) {
+                btn.innerText = "ストップ";
+                btn.className = "bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded w-full";
+            } else {
+                btn.innerText = "再開";
+                btn.className = "bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded w-full";
+            }
+        }
+
+        function resetSimulation() {
+            isRunning = false;
+            hasCollided = false; // フラグのリセット
+            document.getElementById('toggleBtn').innerText = "スタート";
+            document.getElementById('toggleBtn').className = "bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded w-full";
+
+            balls = [];
+            
+            const b1vx = parseFloat(document.getElementById('b1_vx').value) || 0;
+            const b1vy = parseFloat(document.getElementById('b1_vy').value) || 0;
+            const b1m  = parseFloat(document.getElementById('b1_m').value) || 3;
+
+            const b2vx = parseFloat(document.getElementById('b2_vx').value) || 0;
+            const b2vy = parseFloat(document.getElementById('b2_vy').value) || 0;
+            const b2m  = parseFloat(document.getElementById('b2_m').value) || 3;
+
+            // 半径を小さく変更 (15 -> 10)
+            let r1 = Math.sqrt(b1m) * 10;
+            let ball1 = new Ball(width * 0.1, height * 0.2, r1, color(240, 240, 240), b1m);
+            ball1.vel.set(b1vx, b1vy);
+            balls.push(ball1);
+
+            let r2 = Math.sqrt(b2m) * 10;
+            let ball2 = new Ball(width * 0.1, height * 0.8, r2, color(220, 50, 50), b2m);
+            ball2.vel.set(b2vx, b2vy);
+            balls.push(ball2);
+            
+            initialMomentum = calculateTotalMomentum();
+            // リセット時も初期速度として現在の速度をセットしておく
+            for (let b of balls) {
+                b.startVel = b.vel.copy();
+            }
+        }
+
+        function calculateTotalMomentum() {
+            let totalP = createVector(0, 0);
+            for (let b of balls) {
+                totalP.add(p5.Vector.mult(b.vel, b.m));
+            }
+            return totalP;
+        }
+
+        function draw() {
+            background(30, 40, 50);
+
+            stroke(255, 10);
+            strokeWeight(1);
+            for(let x = 0; x < width; x+=50) line(x, 0, x, height);
+            for(let y = 0; y < height; y+=50) line(0, y, width, y);
+
+            if (isRunning) {
+                let steps = 2;
+                for(let s=0; s<steps; s++) {
+                    for (let b of balls) {
+                        b.update();
+                    }
+                    for (let i = 0; i < balls.length; i++) {
+                        for (let j = i + 1; j < balls.length; j++) {
+                            balls[i].checkCollision(balls[j]);
+                        }
+                    }
+                }
+
+                let allOffScreen = balls.every(b => b.isOffScreen());
+                if (allOffScreen) {
+                    resetSimulation(); 
+                }
+            } else {
+                if (!isRunning) {
+                    initialMomentum = calculateTotalMomentum();
+                }
+            }
+
+            let currentTotalP = calculateTotalMomentum();
+            let totalEnergy = 0;
+
+            for (let b of balls) {
+                b.display();
+                b.displayMomentumVector();
+                totalEnergy += 0.5 * b.m * b.vel.magSq();
+            }
+
+            if (dragBall) {
+                stroke(255, 200);
+                strokeWeight(2);
+                line(dragBall.pos.x, dragBall.pos.y, mouseX, mouseY);
+                noStroke();
+            }
+
+            document.getElementById('totalP').innerText = currentTotalP.mag().toFixed(2);
+            document.getElementById('totalE').innerText = totalEnergy.toFixed(2);
+
+            // HUD表示（総運動量、変化量など）
+            displayHUD(currentTotalP);
+        }
+
+        function displayHUD(currP) {
+            let originX = width * 0.35;
+            let originY = height * 0.5;
+            let pScale = 8.0; 
+
+            let showTotal = document.getElementById('showTotalMomentum').checked;
+            let showDeltaP1 = document.getElementById('showDeltaP1').checked;
+            let showDeltaP2 = document.getElementById('showDeltaP2').checked;
+
+            if (!showTotal && !showDeltaP1 && !showDeltaP2) return;
+
+            // --- 距離によるフェードイン・アウト処理 ---
+            if (balls.length >= 2) {
+                let d1 = dist(balls[0].pos.x, balls[0].pos.y, originX, originY);
+                let d2 = dist(balls[1].pos.x, balls[1].pos.y, originX, originY);
+                let minDist = Math.min(d1, d2); 
+
+                let fadeStart = 250; 
+                let fadeEnd = 150;   
+
+                if (minDist > fadeStart) return;
+
+                let alpha = map(minDist, fadeStart, fadeEnd, 0, 255, true);
+
+                // 十字マーカー
+                stroke(255, alpha * 0.2); 
+                strokeWeight(1);
+                line(originX - 10, originY, originX + 10, originY);
+                line(originX, originY - 10, originX, originY + 10);
+
+                // ------------------------------------------------
+                // 1. 総運動量と平行四辺形の描画
+                // ------------------------------------------------
+                if (showTotal) {
+                    let baseColor;
+                    if (hasCollided) {
+                        baseColor = color(255, 0, 255, alpha); 
+                    } else {
+                        baseColor = color(0, 255, 255, alpha); 
+                    }
+
+                    // ラベル
+                    noStroke();
+                    textAlign(LEFT);
+                    textSize(12);
+                    fill(red(baseColor), green(baseColor), blue(baseColor), alpha);
+                    let label = hasCollided ? "Total Momentum (After)" : "Total Momentum (Before)";
+                    text(label, originX + 10, originY - 15);
+
+                    // 平行四辺形 (破線)
+                    let p1 = p5.Vector.mult(balls[0].vel, balls[0].m).mult(pScale);
+                    let p2 = p5.Vector.mult(balls[1].vel, balls[1].m).mult(pScale);
+                    
+                    let Ax = originX + p1.x;
+                    let Ay = originY + p1.y;
+                    let Bx = originX + p2.x;
+                    let By = originY + p2.y;
+                    let Cx = originX + p1.x + p2.x; 
+                    let Cy = originY + p1.y + p2.y;
+
+                    stroke(baseColor);
+                    strokeWeight(1);
+                    drawingContext.setLineDash([5, 5]); 
+
+                    line(originX, originY, Ax, Ay); 
+                    line(originX, originY, Bx, By); 
+                    line(Ax, Ay, Cx, Cy); 
+                    line(Bx, By, Cx, Cy); 
+
+                    drawingContext.setLineDash([]); 
+
+                    // 総運動量ベクトル (実線)
+                    stroke(baseColor);
+                    strokeWeight(4); 
+                    let cx = currP.x * pScale;
+                    let cy = currP.y * pScale;
+                    
+                    line(originX, originY, originX + cx, originY + cy);
+
+                    push();
+                    translate(originX + cx, originY + cy);
+                    rotate(currP.heading());
+                    stroke(red(baseColor), green(baseColor), blue(baseColor), alpha);
+                    line(0, 0, -8, -8);
+                    line(0, 0, -8, 8);
+                    pop();
+                }
+
+                // ------------------------------------------------
+                // 2. 運動量変化ベクトルの描画 (Delta P)
+                // ------------------------------------------------
+                // 衝突後のみ表示、または衝突中
+                if (hasCollided) {
+                    // 白ボールの変化 (Delta P1)
+                    if (showDeltaP1) {
+                        let p_start = p5.Vector.mult(balls[0].startVel, balls[0].m);
+                        let p_curr = p5.Vector.mult(balls[0].vel, balls[0].m);
+                        let deltaP = p5.Vector.sub(p_curr, p_start).mult(pScale);
+
+                        drawVector(originX, originY, deltaP, color(255, 255, 255, alpha), "Δp1");
+                    }
+
+                    // 赤ボールの変化 (Delta P2)
+                    if (showDeltaP2) {
+                        let p_start = p5.Vector.mult(balls[1].startVel, balls[1].m);
+                        let p_curr = p5.Vector.mult(balls[1].vel, balls[1].m);
+                        let deltaP = p5.Vector.sub(p_curr, p_start).mult(pScale);
+
+                        drawVector(originX, originY, deltaP, color(255, 80, 80, alpha), "Δp2");
+                    }
+                }
+            }
+        }
+
+        function drawVector(x, y, v, col, label) {
+            stroke(col);
+            strokeWeight(3);
+            line(x, y, x + v.x, y + v.y);
+            
+            push();
+            translate(x + v.x, y + v.y);
+            rotate(v.heading());
+            line(0, 0, -6, -6);
+            line(0, 0, -6, 6);
+            pop();
+
+            if (label) {
+                noStroke();
+                fill(col);
+                textSize(12);
+                textAlign(LEFT);
+                text(label, x + v.x + 5, y + v.y + 5);
+            }
+        }
+
+        function mousePressed() {
+            for (let b of balls) {
+                if (b.isClicked(mouseX, mouseY)) {
+                    dragBall = b;
+                    b.isDragging = true;
+                    if (isRunning) {
+                        b.vel.mult(0);
+                    }
+                    break;
+                }
+            }
+        }
+
+        function mouseDragged() {
+            if (dragBall) {
+                dragBall.pos.x = mouseX;
+                dragBall.pos.y = mouseY;
+            }
+            return false;
+        }
+
+        function mouseReleased() {
+            if (dragBall) {
+                dragBall.isDragging = false;
+                dragBall = null;
+            }
+        }
+
+        class Ball {
+            constructor(x, y, r, baseColor, m) {
+                this.pos = createVector(x, y);
+                this.vel = createVector(0, 0);
+                this.startVel = createVector(0, 0); // 初期速度記録用
+                this.r = r; 
+                this.m = m; 
+                let darkness = map(m, 1, 10, 0, 0.7);
+                this.c = lerpColor(baseColor, color(0, 0, 0), darkness);
+                this.isDragging = false;
+            }
+
+            update() {
+                if (!this.isDragging) {
+                    this.pos.add(this.vel);
+                }
+            }
+
+            isOffScreen() {
+                return (this.pos.x < -this.r || 
+                        this.pos.x > width + this.r || 
+                        this.pos.y < -this.r || 
+                        this.pos.y > height + this.r);
+            }
+
+            display() {
+                noStroke();
+                fill(0, 50);
+                ellipse(this.pos.x + 5, this.pos.y + 5, this.r * 2);
+
+                fill(this.c);
+                if (this.isDragging) {
+                    stroke(255, 255, 0);
+                    strokeWeight(3);
+                } else {
+                    noStroke();
+                }
+                ellipse(this.pos.x, this.pos.y, this.r * 2);
+
+                fill(255, 200);
+                textAlign(CENTER, CENTER);
+                noStroke();
+                text(this.m, this.pos.x, this.pos.y);
+
+                fill(255, 100);
+                ellipse(this.pos.x - this.r * 0.3, this.pos.y - this.r * 0.3, this.r * 0.5);
+            }
+
+            displayMomentumVector() {
+                const show = document.getElementById('showMomentum').checked;
+                if (!show) return;
+
+                if (this.vel.mag() > 0.01) {
+                    stroke(255, 200);
+                    strokeWeight(2);
+                    let pScale = 8.0; 
+                    let vectorX = this.vel.x * this.m * pScale;
+                    let vectorY = this.vel.y * this.m * pScale;
+                    line(this.pos.x, this.pos.y, this.pos.x + vectorX, this.pos.y + vectorY);
+                    
+                    push();
+                    translate(this.pos.x + vectorX, this.pos.y + vectorY);
+                    rotate(createVector(vectorX, vectorY).heading());
+                    let arrowSize = 5;
+                    line(0, 0, -arrowSize, -arrowSize);
+                    line(0, 0, -arrowSize, arrowSize);
+                    pop();
+                    noStroke();
+                }
+            }
+
+            isClicked(mx, my) {
+                let d = dist(mx, my, this.pos.x, this.pos.y);
+                return d < this.r;
+            }
+
+            checkCollision(other) {
+                let distanceVect = p5.Vector.sub(other.pos, this.pos);
+                let distanceVectMag = distanceVect.mag();
+                let minDistance = this.r + other.r;
+
+                if (distanceVectMag < minDistance) {
+                    
+                    // 衝突検知
+                    hasCollided = true;
+
+                    let distanceCorrection = (minDistance - distanceVectMag) / 2.0;
+                    let d = distanceVect.copy();
+                    let correctionVector = d.normalize().mult(distanceCorrection);
+                    other.pos.add(correctionVector);
+                    this.pos.sub(correctionVector);
+
+                    let theta = distanceVect.heading();
+                    let sine = sin(theta);
+                    let cosine = cos(theta);
+
+                    let bTemp = [new p5.Vector(), new p5.Vector()];
+                    bTemp[0].x = cosine * this.vel.x + sine * this.vel.y;
+                    bTemp[0].y = cosine * this.vel.y - sine * this.vel.x;
+                    bTemp[1].x = cosine * other.vel.x + sine * other.vel.y;
+                    bTemp[1].y = cosine * other.vel.y - sine * other.vel.x;
+
+                    let vFinal = [new p5.Vector(), new p5.Vector()];
+                    vFinal[0].x = ((this.m - other.m) * bTemp[0].x + 2 * other.m * bTemp[1].x) / (this.m + other.m);
+                    vFinal[0].y = bTemp[0].y;
+                    vFinal[1].x = ((other.m - this.m) * bTemp[1].x + 2 * this.m * bTemp[0].x) / (this.m + other.m);
+                    vFinal[1].y = bTemp[1].y;
+
+                    bTemp[0].x = cosine * vFinal[0].x - sine * vFinal[0].y;
+                    bTemp[0].y = cosine * vFinal[0].y + sine * vFinal[0].x;
+                    bTemp[1].x = cosine * vFinal[1].x - sine * vFinal[1].y;
+                    bTemp[1].y = cosine * vFinal[1].y + sine * vFinal[1].x;
+
+                    this.vel.x = bTemp[0].x;
+                    this.vel.y = bTemp[0].y;
+                    other.vel.x = bTemp[1].x;
+                    other.vel.y = bTemp[1].y;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
