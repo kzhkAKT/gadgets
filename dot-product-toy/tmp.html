@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内積ビジュアライザー</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* カスタムスタイルが必要な場合はここに記述 */
+        body {
+            background-color: #f8fafc;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useMemo } = React;
+
+        // --- Icons (Lucide-like SVGs to avoid dependency issues on simple static hosts) ---
+        const IconWrapper = ({ children, size = 24, className = "" }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+            >
+                {children}
+            </svg>
+        );
+
+        const RotateCcw = ({ size, className }) => (
+            <IconWrapper size={size} className={className}>
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12" />
+                <path d="M3 3v9h9" />
+            </IconWrapper>
+        );
+
+        const Calculator = ({ size, className }) => (
+            <IconWrapper size={size} className={className}>
+                <rect width="16" height="20" x="4" y="2" rx="2" />
+                <line x1="8" x2="16" y1="6" y2="6" />
+                <line x1="16" x2="16" y1="14" y2="18" />
+                <path d="M16 10h.01" />
+                <path d="M12 10h.01" />
+                <path d="M8 10h.01" />
+                <path d="M12 14h.01" />
+                <path d="M8 14h.01" />
+                <path d="M12 18h.01" />
+                <path d="M8 18h.01" />
+            </IconWrapper>
+        );
+
+        const Ruler = ({ size, className }) => (
+            <IconWrapper size={size} className={className}>
+                <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
+                <path d="m14.5 12.5 2-2" />
+                <path d="m11.5 9.5 2-2" />
+                <path d="m8.5 6.5 2-2" />
+                <path d="m17.5 15.5 2-2" />
+            </IconWrapper>
+        );
+
+        const Eye = ({ size, className }) => (
+            <IconWrapper size={size} className={className}>
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+            </IconWrapper>
+        );
+
+        // --- Main Component ---
+        const DotProductToy = () => {
+            const width = 600;
+            const height = 400;
+            const originX = width / 2;
+            const originY = height / 2;
+            const gridScale = 40;
+
+            const [vecA, setVecA] = useState({ x: 3, y: 2 });
+            const [vecB, setVecB] = useState({ x: 4, y: -1 });
+            const [dragging, setDragging] = useState(null);
+            const svgRef = useRef(null);
+
+            const getGridCoordinates = (clientX, clientY) => {
+                if (!svgRef.current) return { x: 0, y: 0 };
+                const rect = svgRef.current.getBoundingClientRect();
+                const x = (clientX - rect.left - originX) / gridScale;
+                const y = -(clientY - rect.top - originY) / gridScale;
+                return { x, y };
+            };
+
+            const toScreen = (x, y) => ({
+                x: originX + x * gridScale,
+                y: originY - y * gridScale,
+            });
+
+            const dotProduct = vecA.x * vecB.x + vecA.y * vecB.y;
+            const magA = Math.sqrt(vecA.x ** 2 + vecA.y ** 2);
+            const magB = Math.sqrt(vecB.x ** 2 + vecB.y ** 2);
+            
+            let angleRad = Math.atan2(vecB.y, vecB.x) - Math.atan2(vecA.y, vecA.x);
+            while (angleRad <= -Math.PI) angleRad += 2 * Math.PI;
+            while (angleRad > Math.PI) angleRad -= 2 * Math.PI;
+            const angleDegDisplay = Math.acos(Math.min(Math.max(dotProduct / (magA * magB || 1), -1), 1)) * (180 / Math.PI);
+
+            const scaleProj = magB === 0 ? 0 : dotProduct / (magB ** 2);
+            const projVec = { x: vecB.x * scaleProj, y: vecB.y * scaleProj };
+
+            const handleStart = (target, e) => {
+                e.preventDefault();
+                setDragging(target);
+            };
+
+            const handleMove = (e) => {
+                if (!dragging) return;
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                
+                const coords = getGridCoordinates(clientX, clientY);
+                const snap = (val) => Math.round(val * 10) / 10;
+                const newVec = { x: snap(coords.x), y: snap(coords.y) };
+
+                if (dragging === 'A') setVecA(newVec);
+                else setVecB(newVec);
+            };
+
+            const handleEnd = () => {
+                setDragging(null);
+            };
+
+            useEffect(() => {
+                const onMove = (e) => handleMove(e);
+                const onUp = () => handleEnd();
+
+                if (dragging) {
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('mouseup', onUp);
+                    window.addEventListener('touchmove', onMove, { passive: false });
+                    window.addEventListener('touchend', onUp);
+                }
+
+                return () => {
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('mouseup', onUp);
+                    window.removeEventListener('touchmove', onMove);
+                    window.removeEventListener('touchend', onUp);
+                };
+            }, [dragging, vecA, vecB]);
+
+            const Arrow = ({ vec, color, label, isDragging }) => {
+                const end = toScreen(vec.x, vec.y);
+                const start = toScreen(0, 0);
+                const angle = Math.atan2(end.y - start.y, end.x - start.x);
+                const headLen = 15;
+                const arrowP1 = {
+                    x: end.x - headLen * Math.cos(angle - Math.PI / 6),
+                    y: end.y - headLen * Math.sin(angle - Math.PI / 6),
+                };
+                const arrowP2 = {
+                    x: end.x - headLen * Math.cos(angle + Math.PI / 6),
+                    y: end.y - headLen * Math.sin(angle + Math.PI / 6),
+                };
+
+                return (
+                    <g className="cursor-pointer" onMouseDown={(e) => handleStart(label, e)} onTouchStart={(e) => handleStart(label, e)}>
+                        <line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke="transparent" strokeWidth="20" />
+                        <circle cx={end.x} cy={end.y} r="15" fill="transparent" />
+                        <line 
+                            x1={start.x} y1={start.y} x2={end.x} y2={end.y} 
+                            stroke={color} strokeWidth="4" 
+                            strokeLinecap="round"
+                        />
+                        <polygon 
+                            points={`${end.x},${end.y} ${arrowP1.x},${arrowP1.y} ${arrowP2.x},${arrowP2.y}`} 
+                            fill={color} 
+                        />
+                        <circle 
+                            cx={end.x} cy={end.y} r={isDragging ? 8 : 6} 
+                            fill="white" stroke={color} strokeWidth="3"
+                            className="transition-all duration-100"
+                        />
+                        <text 
+                            x={end.x + 15} y={end.y - 15} 
+                            fill={color} fontWeight="bold" fontSize="16"
+                            className="select-none pointer-events-none"
+                        >
+                            {label} ({vec.x.toFixed(1)}, {vec.y.toFixed(1)})
+                        </text>
+                    </g>
+                );
+            };
+
+            const Grid = () => {
+                const lines = [];
+                const rangeX = Math.ceil(width / gridScale / 2);
+                const rangeY = Math.ceil(height / gridScale / 2);
+
+                for (let i = -rangeX; i <= rangeX; i++) {
+                    const p = toScreen(i, 0);
+                    lines.push(
+                        <line key={`v${i}`} x1={p.x} y1={0} x2={p.x} y2={height} stroke={i === 0 ? "#94a3b8" : "#e2e8f0"} strokeWidth={i === 0 ? 2 : 1} />
+                    );
+                }
+                for (let i = -rangeY; i <= rangeY; i++) {
+                    const p = toScreen(0, i);
+                    lines.push(
+                        <line key={`h${i}`} x1={0} y1={p.y} x2={width} y2={p.y} stroke={i === 0 ? "#94a3b8" : "#e2e8f0"} strokeWidth={i === 0 ? 2 : 1} />
+                    );
+                }
+                return <g>{lines}</g>;
+            };
+
+            const resultColor = Math.abs(dotProduct) < 0.1 ? "text-gray-500" : dotProduct > 0 ? "text-green-600" : "text-red-600";
+            const resultBg = Math.abs(dotProduct) < 0.1 ? "bg-gray-100" : dotProduct > 0 ? "bg-green-50" : "bg-red-50";
+
+            return (
+                <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 bg-white rounded-xl shadow-lg font-sans my-8">
+                    <h1 className="text-2xl font-bold mb-2 text-gray-800">内積ビジュアライザー</h1>
+                    <p className="text-gray-600 mb-4 text-sm text-center">
+                        ベクトル <span className="text-blue-600 font-bold">A</span> と <span className="text-pink-600 font-bold">B</span> の先端をドラッグして動かしてみよう。<br/>
+                        直角（90°）のときに内積がどうなるか注目！
+                    </p>
+
+                    <div 
+                        className="relative bg-white border-2 border-slate-200 rounded-lg overflow-hidden cursor-crosshair touch-none shadow-inner mx-auto"
+                        style={{ width: width, height: height, maxWidth: '100%' }}
+                    >
+                        <svg 
+                            ref={svgRef}
+                            width={width} 
+                            height={height} 
+                            viewBox={`0 0 ${width} ${height}`}
+                            className="w-full h-auto"
+                        >
+                            <Grid />
+                            {magB > 0.1 && (
+                                <>
+                                    <line 
+                                        x1={toScreen(vecA.x, vecA.y).x} y1={toScreen(vecA.x, vecA.y).y}
+                                        x2={toScreen(projVec.x, projVec.y).x} y2={toScreen(projVec.x, projVec.y).y}
+                                        stroke="#94a3b8" strokeWidth="2" strokeDasharray="5,5"
+                                    />
+                                    <line 
+                                        x1={toScreen(0, 0).x} y1={toScreen(0, 0).y}
+                                        x2={toScreen(projVec.x, projVec.y).x} y2={toScreen(projVec.x, projVec.y).y}
+                                        stroke="#f59e0b" strokeWidth="6" opacity="0.4"
+                                    />
+                                    <text x={toScreen(projVec.x, projVec.y).x + 10} y={toScreen(projVec.x, projVec.y).y + 10} fill="#d97706" fontSize="12">
+                                        正射影 (影)
+                                    </text>
+                                </>
+                            )}
+                            <Arrow vec={vecB} color="#db2777" label="B" isDragging={dragging === 'B'} />
+                            <Arrow vec={vecA} color="#2563eb" label="A" isDragging={dragging === 'A'} />
+                            <g>
+                                {magA > 0 && magB > 0 && (
+                                    <text x={originX + 20} y={originY - 20} fill="#475569" fontSize="14">
+                                        θ = {angleDegDisplay.toFixed(0)}°
+                                    </text>
+                                )}
+                            </g>
+                        </svg>
+
+                        <button 
+                            onClick={() => { setVecA({x:3, y:2}); setVecB({x:4, y:-1}); }}
+                            className="absolute top-2 right-2 p-2 bg-white rounded-full shadow hover:bg-gray-50 border border-gray-200"
+                            title="リセット"
+                        >
+                            <RotateCcw size={16} className="text-gray-600" />
+                        </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mt-6">
+                        <div className="p-4 rounded-xl border border-gray-200 bg-slate-50">
+                            <div className="flex items-center gap-2 mb-3 text-slate-700 font-semibold border-b pb-2 border-slate-200">
+                                <Ruler size={20} />
+                                <span>幾何学的な意味 (長さと角度)</span>
+                            </div>
+                            <div className="space-y-2 font-mono text-sm md:text-base">
+                                <div className="flex justify-between">
+                                    <span className="text-blue-600">|A| (長さ)</span>
+                                    <span>{magA.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-pink-600">|B| (長さ)</span>
+                                    <span>{magB.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-purple-600">cos(θ)</span>
+                                    <span>{Math.cos(angleDegDisplay * Math.PI / 180).toFixed(3)}</span>
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-slate-200 text-right text-gray-500 text-xs">
+                                    式: |A| × |B| × cos(θ)
+                                </div>
+                                <div className={`text-right font-bold text-xl ${resultColor}`}>
+                                    = {(magA * magB * Math.cos(angleDegDisplay * Math.PI / 180)).toFixed(1)}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl border border-gray-200 bg-slate-50">
+                            <div className="flex items-center gap-2 mb-3 text-slate-700 font-semibold border-b pb-2 border-slate-200">
+                                <Calculator size={20} />
+                                <span>代数的な計算 (成分)</span>
+                            </div>
+                            <div className="space-y-2 font-mono text-sm md:text-base">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">X成分同士の積</span>
+                                    <span>
+                                        <span className="text-blue-600">{vecA.x.toFixed(1)}</span> × <span className="text-pink-600">{vecB.x.toFixed(1)}</span> = {(vecA.x * vecB.x).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Y成分同士の積</span>
+                                    <span>
+                                        <span className="text-blue-600">{vecA.y.toFixed(1)}</span> × <span className="text-pink-600">{vecB.y.toFixed(1)}</span> = {(vecA.y * vecB.y).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-slate-200 text-right text-gray-500 text-xs">
+                                    式: (Ax × Bx) + (Ay × By)
+                                </div>
+                                <div className={`text-right font-bold text-xl ${resultColor}`}>
+                                    = {dotProduct.toFixed(1)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className={`mt-6 p-4 w-full rounded-xl text-center border-2 transition-colors duration-300 ${resultBg} ${Math.abs(dotProduct) < 0.1 ? 'border-gray-300' : dotProduct > 0 ? 'border-green-200' : 'border-red-200'}`}>
+                        <h2 className="text-lg font-bold text-gray-800 mb-1">
+                            内積の値: <span className={`text-3xl ml-2 ${resultColor}`}>{dotProduct.toFixed(1)}</span>
+                        </h2>
+                        <p className="text-gray-700 font-medium mt-2">
+                            {Math.abs(dotProduct) < 0.1 ? (
+                                <span className="flex items-center justify-center gap-2">
+                                    🛑 直交しています！ (90度)
+                                </span>
+                            ) : dotProduct > 0 ? (
+                                <span className="flex items-center justify-center gap-2">
+                                    同じ方向を向いています (鋭角)
+                                </span>
+                            ) : (
+                                <span className="flex items-center justify-center gap-2">
+                                    逆方向を向いています (鈍角)
+                                </span>
+                            )}
+                        </p>
+                        
+                        <div className="mt-4 text-xs text-gray-500 flex items-center justify-center gap-2">
+                            <Eye size={16}/>
+                            <span>ヒント: 黄色い線は「AがBの方向に落とした影」です。内積はこの影の長さとBの長さの積に関連しています。</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DotProductToy />);
+    </script>
+</body>
+</html>
