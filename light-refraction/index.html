@@ -109,8 +109,8 @@
             <input type="range" id="speed-slider" min="0.0" max="4.0" step="0.05" value="0.75">
         </div>
         <div class="control-group">
-            <label>基本周波数</label>
-            <input type="range" id="freq-slider" min="0.05" max="0.4" step="0.01" value="0.15">
+            <label>基本波長 (真空中)</label>
+            <input type="range" id="wavelength-slider" min="40" max="300" step="10" value="100">
         </div>
         
         <div style="width: 100%; height: 1px; background: #eee; margin: 5px 0;"></div>
@@ -137,13 +137,13 @@
             <strong>解説:</strong><br>
             光は屈折率の高い媒質に入ると速度が遅くなり、波長が短くなります。<br>
             ・<strong>波の右向きの速さ:</strong> 波の進むスピード。<br>
-            ・<strong>周波数:</strong> 波の細かさ（色は変わりません）。<br>
+            ・<strong>基本波長:</strong> 波の長さ（間隔）。値を大きくすると波長が長くなります。<br>
             濃い色のエリア（高屈折率）で、波の間隔が詰まりゆっくり進む様子を観察してください。
         </p>
     </div>
 
     <script>
-        let n1Slider, n2Slider, n3Slider, freqSlider, speedSlider;
+        let n1Slider, n2Slider, n3Slider, wavelengthSlider, speedSlider;
         let n1Val, n2Val, n3Val;
         
         // 媒質の初期設定 (色は動的に計算するため固定色は削除)
@@ -164,7 +164,7 @@
             n1Slider = select('#n1-slider');
             n2Slider = select('#n2-slider');
             n3Slider = select('#n3-slider');
-            freqSlider = select('#freq-slider');
+            wavelengthSlider = select('#wavelength-slider');
             speedSlider = select('#speed-slider');
             
             n1Val = select('#n1-val');
@@ -186,8 +186,17 @@
             zones[0].n = float(n1Slider.value());
             zones[1].n = float(n2Slider.value());
             zones[2].n = float(n3Slider.value());
-            const freq = float(freqSlider.value());
+            
+            const lambda0 = float(wavelengthSlider.value());
             const simSpeed = float(speedSlider.value());
+            
+            // 空間スケール係数 (画面上の描画サイズ調整用)
+            let spatialScale = 0.4;
+            
+            // 波長から周波数を逆算する
+            // lambda = 2*PI / k, k = freq * spatialScale
+            // -> freq = 2*PI / (lambda * spatialScale)
+            const freq = TWO_PI / (lambda0 * spatialScale);
 
             n1Val.html(zones[0].n.toFixed(1));
             n2Val.html(zones[1].n.toFixed(1));
@@ -240,7 +249,6 @@
 
             let amplitude = 80;
             let centerY = height / 2;
-            let spatialScale = 0.4; 
             let K = freq * spatialScale;
 
             // 波の描画
