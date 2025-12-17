@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>雨と相対速度シミュレーター</title>
+    <meta name="description" content="雨の落下と歩く人の相対速度を視覚的に理解できる物理シミュレーター">
+    
+    <!-- P5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    
+    <!-- MathJax Configuration -->
+    <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: {
+        fontCache: 'global'
+      },
+      startup: {
+        typeset: true 
+      }
+    };
+    </script>
+    <!-- Load MathJax -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <style>
+        /* --- 1. Minimal CSS Variables --- */
+        :root {
+            --bg-color: #0f172a;       
+            --sidebar-bg: rgba(30, 41, 59, 0.98); 
+            --overlay-bg: rgba(15, 23, 42, 0.85); 
+            --border-color: #334155;   
+            --text-main: #e2e8f0;      
+            --text-muted: #94a3b8;     
+            --accent-blue: #38bdf8;    
+            --accent-green: #10b981;   
+            --accent-rain: #3b82f6;    
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        /* --- 2. Base Reset & Layout --- */
+        body {
+            margin: 0; padding: 0;
+            width: 100vw; height: 100vh;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            display: flex;
+            flex-direction: row; 
+        }
+
+        /* --- 3. Sidebar Components --- */
+        .sidebar {
+            width: 280px;
+            height: 100%;
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(8px);
+            z-index: 10;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        .header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .header h1 { margin: 0; font-size: 1rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+        .header p { margin: 4px 0 0; font-size: 10px; color: var(--text-muted); }
+
+        .content-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .control-group { margin-bottom: 1.25rem; }
+        .label-title {
+            display: block;
+            font-size: 10px; font-weight: bold;
+            text-transform: uppercase; color: var(--text-muted);
+            margin-bottom: 6px; letter-spacing: 0.05em;
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%; padding: 10px 12px;
+            border-radius: 6px; border: 1px solid transparent;
+            font-size: 12px; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+            transition: all 0.2s; margin-bottom: 8px;
+            background: #334155; color: var(--text-muted); font-weight: 500;
+        }
+        .btn:hover { background: #475569; color: #fff; }
+        .btn:active { transform: scale(0.98); }
+        .btn.active {
+            background: var(--accent-blue); color: #fff;
+            border-color: var(--accent-blue);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Sliders */
+        .sliders-wrapper {
+            display: block; /* Default vertical stack */
+        }
+
+        .slider-container {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid var(--border-color);
+            padding: 10px; border-radius: 8px; margin-bottom: 12px;
+        }
+        .slider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 12px; }
+        .tag-val { background: #0f172a; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: 11px; white-space: nowrap; }
+        
+        input[type="range"] {
+            -webkit-appearance: none; width: 100%; height: 12px;
+            background: transparent; outline: none; margin: 0; position: relative;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            width: 100%; height: 6px; background: #475569; border-radius: 3px;
+        }
+        input[type="range"]::-moz-range-track {
+            width: 100%; height: 6px; background: #475569; border-radius: 3px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 20px; width: 20px;
+            border-radius: 50%; background: var(--accent-blue);
+            border: 2px solid var(--bg-color); margin-top: -7px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+        input[type="range"]::-moz-range-thumb {
+            height: 20px; width: 20px; border-radius: 50%;
+            background: var(--accent-blue); border: 2px solid var(--bg-color);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* --- 5. Info Box --- */
+        .info-box {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid #475569;
+            border-radius: 4px; padding: 10px;
+            font-size: 11px; line-height: 1.5; color: #cbd5e1;
+            height: 80px; 
+            overflow-y: auto;
+        }
+        .highlight { color: #fde047; font-weight: bold; } 
+
+        /* CSS Colors for MathJax Containers */
+        .math-green { color: rgb(16, 185, 129); }
+        .math-blue { color: rgb(59, 130, 246); }
+        .math-sky { color: rgb(56, 189, 248); }
+
+        /* --- 6. Main Canvas Area --- */
+        #simulation-container {
+            flex: 1;
+            position: relative;
+            background: var(--bg-color);
+            width: 100%; height: 100%;
+            overflow: hidden;
+        }
+
+        /* --- 7. Vector Overlay --- */
+        .vector-overlay {
+            position: absolute;
+            top: 20px; right: 20px;
+            width: auto;
+            min-width: 230px;
+            background: var(--overlay-bg);
+            backdrop-filter: blur(6px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 20;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: opacity 0.3s;
+        }
+        
+        #formula-display {
+            margin-bottom: 8px;
+            font-size: 16px;
+            text-align: center;
+            color: var(--text-main);
+            width: 100%;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 6px;
+            min-height: 30px; 
+        }
+
+        #vector-container {
+            width: 210px;
+            height: 140px;
+            position: relative;
+            margin: 0 auto;
+        }
+
+        /* Vector Labels Overlay */
+        .vec-label {
+            position: absolute;
+            pointer-events: none;
+            font-size: 16px;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .icon { width: 16px; height: 16px; fill: currentColor; }
+
+        /* --- 8. Responsive Design (Mobile) --- */
+        @media (max-width: 768px) {
+            body { flex-direction: column-reverse; } /* Controls bottom, Canvas top */
+            #simulation-container { height: 50vh; flex: none; }
+            .sidebar {
+                width: 100%; height: 50vh;
+                border-right: none; border-top: 1px solid var(--border-color);
+                flex-direction: column;
+            }
+            .header { display: none; }
+            .content-scroll { padding: 12px; }
+            
+            /* Mobile Grid for Top Section */
+            .mobile-grid-row {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+                margin-bottom: 10px;
+            }
+            .mobile-grid-row .control-group { margin-bottom: 0; }
+            
+            /* Mobile Sliders Grid */
+            .sliders-wrapper {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+            .slider-container { margin-bottom: 0; }
+            .slider-header span { font-size: 10px; }
+            .tag-val { font-size: 9px; padding: 1px 4px; }
+            
+            .control-group { margin-bottom: 1rem; }
+            
+            /* Adjust Vector Overlay for Mobile */
+            .vector-overlay {
+                top: 10px; right: 10px;
+                width: auto;
+                min-width: 150px;
+                padding: 8px;
+                transform-origin: top right;
+                transform: scale(0.85); 
+            }
+            #vector-container { width: 210px; height: 100px; }
+            #formula-display { font-size: 12px; margin-bottom: 4px; padding-bottom: 4px;}
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="header">
+            <h1>
+                <svg class="icon" viewBox="0 0 512 512" style="width:20px; height:20px;"><path d="M128 256h32V144c0-70.7 57.3-128 128-128s128 57.3 128 128v16h8c57.4 0 104 46.6 104 104s-46.6 104-104 104H128C57.3 368 0 310.7 0 240s57.3-128 128-128zm32 176h248c13.2 0 24-10.8 24-24s-10.8-24-24-24H160c-13.2 0-24 10.8-24 24s10.8 24 24 24zm-32 32h16c8.8 0 16 7.2 16 16s-7.2 16-16 16H128c-8.8 0-16-7.2-16-16s7.2-16 16-16zm256 0h16c8.8 0 16 7.2 16 16s-7.2 16-16 16h-16c-8.8 0-16-7.2-16-16s7.2-16 16-16z" fill="#38bdf8"/></svg>
+                相対速度
+            </h1>
+            <p>Physics Simulator</p>
+        </div>
+
+        <div class="content-scroll">
+            <!-- Mobile Grid for View Mode & Info -->
+            <div class="mobile-grid-row">
+                <div class="control-group">
+                    <span class="label-title">視点モード</span>
+                    <button id="btn-mode-ground" class="btn active">
+                        <svg class="icon" viewBox="0 0 512 512"><path d="M192 208c0-44.2 35.8-80 80-80s80 35.8 80 80-35.8 80-80 80-80-35.8-80-80zM272 0c132.5 0 240 107.5 240 240S404.5 480 272 480 32 372.5 32 240 139.5 0 272 0zM55.8 220.6c-5.7 17.9-5.7 37 0 54.9l8.6 27c3.2 10.1 14.3 15.6 24.4 12.4s15.6-14.3 12.4-24.4l-8.6-27c-1.9-6-1.9-12.3 0-18.3l8.6-27c3.2-10.1-2.4-21.2-12.4-24.4s-21.2 2.4-24.4 12.4l-8.6 27z"/></svg>
+                        地上から (静止)
+                    </button>
+                    <button id="btn-mode-observer" class="btn">
+                        <svg class="icon" viewBox="0 0 320 512"><path d="M208 48c0 26.5-21.5 48-48 48s-48-21.5-48-48 21.5-48 48-48 48 21.5 48 48zm91.8 193.1l-25.9-11.4c-16.1-7.1-32.5-12.9-49.3-17.5l8.6-28c4.6-15 20.3-25.5 36.3-25.5h16c8.8 0 16-7.2 16-16s-7.2-16-16-16h-16c-31.5 0-60.9 19.3-71.1 48.6l-18.4 52.8c-1.4 4.1-2.4 8.2-2.9 12.4l-1.3 11.5c-4.6 40.5 25 76.8 65.6 80.5 2.1 .2 4.2 .3 6.3 .3 18 0 35.5-7.5 47.7-20.6l23.9-25.6c6.2-6.6 5.8-17-1-23.2s-17-5.8-23.2 1zM28.6 157.9c-8.5 3.8-12.4 13.9-8.6 22.4l24 53.3c4.8 10.6 15.3 17.4 26.9 17.4 2.5 0 5-.3 7.5-1l6.6-1.8c16.1-4.3 27-18.8 27-35.4v-8.8l3.1-9c3.1-9 14.1-13.6 22.6-9.4l45.4 22.7c1.7 .8 3.3 1.8 4.9 2.8l16.8 11.2c16 10.7 25.6 28.6 25.6 47.8V480c0 17.7 14.3 32 32 32s32-14.3 32-32V270.2c0-38.3-19.1-74-51.1-95.3l-16.8-11.2c-12.6-8.4-26.6-14.6-41.2-18.2l-3.2-27.7c-9.1-78.6-112.9-93-145.4-20.9z"/></svg>
+                        歩く人から (<span id="lbl-btn-v" class="math-sky"></span>)
+                    </button>
+                </div>
+
+                <div class="control-group">
+                    <span class="label-title">状況解説</span>
+                    <div class="info-box" id="info-text"></div>
+                </div>
+            </div>
+
+            <!-- Parameters -->
+            <div class="control-group" style="margin-top:1rem;">
+                <span class="label-title">パラメータ</span>
+                
+                <div class="sliders-wrapper">
+                    <!-- Observer Speed -->
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span style="color:var(--accent-green)">人 <span id="lbl-v" class="math-green"></span></span>
+                            <span class="tag-val col-green"><span id="val-speed">0</span> km/h</span>
+                        </div>
+                        <input type="range" id="input-speed" min="-30" max="30" value="0" step="0.5">
+                        <div class="slider-header" style="color:var(--text-muted); font-size:9px;">
+                            <span>後退</span><span>停止</span><span>前進</span>
+                        </div>
+                    </div>
+
+                    <!-- Rain Speed -->
+                    <div class="slider-container">
+                        <div class="slider-header">
+                            <span style="color:var(--accent-rain)">雨 <span id="lbl-u" class="math-blue"></span></span>
+                            <span class="tag-val col-blue"><span id="val-rain">20</span> km/h</span>
+                        </div>
+                        <input type="range" id="input-rain" min="5" max="50" value="20" step="1">
+                        <div class="slider-header" style="color:var(--text-muted); font-size:9px;">
+                            <span>小雨</span><span>豪雨</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <button id="btn-trace" class="btn">
+                    <div id="trace-dot" style="width:6px; height:6px; background:#64748b; border-radius:50%;"></div>
+                    軌跡を表示
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Canvas Area with Overlay -->
+    <div id="simulation-container">
+        <!-- Floating Vector Overlay -->
+        <div class="vector-overlay">
+            <div id="formula-display">
+                <span class="math-sky">$\vec{u}'$</span> = <span class="math-blue">$\vec{u}$</span> − <span class="math-green">$\vec{v}$</span>
+            </div>
+            <div id="vector-container">
+                <div id="v-lbl-u" class="vec-label math-blue">$\vec{u}$</div>
+                <div id="v-lbl-v" class="vec-label math-green">$-\vec{v}$</div>
+                <div id="v-lbl-rel" class="vec-label math-sky">$\vec{u}'$</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONFIG = {
+            physics: { scale: 15, maxDrops: 250 },
+        };
+
+        const TEXTS = {
+            ground: "停止中。雨は垂直に降っています。",
+            observerFwd: `<span style="color:var(--accent-blue);font-weight:bold">自分視点 (<span class="math-sky">$\\vec{u}'$</span>)</span><br>雨が<span class="highlight">前方から斜めに</span>見えます。`,
+            observerBack: `<span style="color:var(--accent-blue);font-weight:bold">自分視点 (<span class="math-sky">$\\vec{u}'$</span>)</span><br>後退中。雨が<span class="highlight">前方へ逃げるように</span>見えます。`,
+            groundMode: `<span style="color:var(--accent-green);font-weight:bold">地上視点</span><br>雨は垂直に降っています。`
+        };
+
+        const state = {
+            v: 0, u: 20, mode: 'ground', trace: false,
+            groundOffset: 0, personX: 0
+        };
+
+        // --- P5 SKETCHES ---
+        const simSketch = (p) => {
+            let drops = [];
+            let cBg, cGround, cGrid, cRain, cPerson, cTrace;
+
+            p.setup = () => {
+                const c = p.createCanvas(100, 100);
+                c.parent('simulation-container');
+                p.windowResized();
+                cBg = p.color(15, 23, 42);
+                cTrace = p.color(15, 23, 42, 40);
+                cGround = p.color(51, 65, 85);
+                cGrid = p.color(71, 85, 105);
+                cRain = p.color(14, 165, 233);
+                cPerson = p.color(16, 185, 129);
+                for (let i = 0; i < CONFIG.physics.maxDrops; i++) drops.push(new Drop(p));
+                state.personX = p.width * 0.3;
+            };
+
+            p.windowResized = () => {
+                const el = document.getElementById('simulation-container');
+                if(el) {
+                    p.resizeCanvas(el.clientWidth, el.clientHeight);
+                    state.personX = p.width * 0.3;
+                }
+            };
+
+            p.draw = () => {
+                const dt = p.deltaTime / 1000;
+                if (state.trace) {
+                    p.noStroke(); p.fill(cTrace); p.rect(0, 0, p.width, p.height);
+                } else {
+                    p.background(cBg);
+                }
+                const speedPx = state.v * CONFIG.physics.scale * dt;
+                if (state.mode === 'ground') {
+                    state.personX += speedPx;
+                    if (state.personX > p.width + 50) state.personX = -50;
+                    if (state.personX < -50) state.personX = p.width + 50;
+                } else {
+                    state.personX = p.width * 0.5;
+                    state.groundOffset -= speedPx;
+                }
+                drawGround(p, cGround, cGrid);
+                for (let d of drops) { d.update(dt); d.draw(p, cRain); }
+                drawPerson(p, state.personX, cPerson);
+            };
+
+            const drawGround = (p, cFill, cStr) => {
+                const groundY = p.height * 0.85;
+                p.noStroke(); p.fill(cFill); p.rect(0, groundY, p.width, p.height - groundY);
+                p.stroke(cStr); p.strokeWeight(1);
+                const gridSize = 100;
+                let startX = (state.mode === 'observer') ? state.groundOffset % gridSize : 0;
+                const cols = Math.ceil(p.width / gridSize) + 2;
+                for (let i = -1; i < cols; i++) {
+                    let x = startX + i * gridSize;
+                    if (state.mode === 'observer' && x > p.width) x -= (cols+1)*gridSize; 
+                    p.line(x, groundY, x, p.height);
+                }
+                p.line(0, groundY, p.width, groundY);
+            };
+
+            const drawPerson = (p, x, color) => {
+                const groundY = p.height * 0.85;
+                const size = 60;
+                const y = groundY - size;
+                p.noStroke(); p.fill(color);
+                p.circle(x + size/2, y + 10, 20); 
+                p.rect(x + size/2 - 2, y + 20, 4, 25); 
+                const swing = state.v === 0 ? 0 : Math.sin(Date.now() / 150) * 15;
+                p.stroke(color); p.strokeWeight(4);
+                p.line(x + size/2, y + 45, x + size/2 - swing, y + size);
+                p.line(x + size/2, y + 45, x + size/2 + swing, y + size);
+                if (state.mode === 'ground' && state.v !== 0) {
+                    const len = Math.abs(state.v) * 3 + 15;
+                    const dir = Math.sign(state.v);
+                    const ex = (x+size/2) + len*dir;
+                    p.strokeWeight(3);
+                    p.line(x+size/2, y-25, ex, y-25);
+                    p.push(); p.translate(ex, y-25);
+                    if(dir<0) p.rotate(p.PI);
+                    p.noStroke(); p.fill(color); p.triangle(0,0, -6,-3, -6,3); p.pop();
+                }
+            };
+        };
+
+        class Drop {
+            constructor(p) { this.p = p; this.reset(true); }
+            reset(rndY) {
+                const w = this.p.width;
+                this.x = Math.random()*(w*2.5) - w*0.75;
+                this.y = rndY ? Math.random()*this.p.height : -50;
+                this.z = Math.random()*0.5 + 0.5;
+                this.len = Math.random()*5 + 8;
+            }
+            update(dt) {
+                const vy = state.u * CONFIG.physics.scale * dt * this.z;
+                let vx = 0;
+                if (state.mode === 'observer') vx = -state.v * CONFIG.physics.scale * dt * this.z;
+                this.x += vx; this.y += vy;
+                if (this.y > this.p.height+50 || this.x < -this.p.width || this.x > this.p.width*2) this.reset(false);
+            }
+            draw(p, cBase) {
+                const vy = state.u * CONFIG.physics.scale * this.z;
+                let vx = 0;
+                if(state.mode === 'observer') vx = -state.v * CONFIG.physics.scale * this.z;
+                const mag = Math.sqrt(vx*vx + vy*vy) || 1;
+                const drawLen = this.len + (mag * 0.02);
+                const tx = this.x - (vx/mag)*drawLen;
+                const ty = this.y - (vy/mag)*drawLen;
+                cBase.setAlpha(this.z * 200);
+                p.stroke(cBase); p.strokeWeight(2 * this.z); p.line(this.x, this.y, tx, ty);
+            }
+        }
+
+        const vecSketch = (p) => {
+            let lblU, lblV, lblRel;
+            p.setup = () => {
+                const c = p.createCanvas(210, 140);
+                c.parent('vector-container');
+                lblU = document.getElementById('v-lbl-u');
+                lblV = document.getElementById('v-lbl-v');
+                lblRel = document.getElementById('v-lbl-rel');
+            };
+            p.draw = () => {
+                p.clear();
+                const cx = p.width/2, cy = 20;
+                const scale = 2.0;
+                const u = state.u * scale;
+                const v = state.v * scale;
+                const ox = cx + v/2, oy = 25; 
+                drawArrow(p, ox, oy, ox, oy+u, '#3b82f6'); 
+                if(v!==0) drawArrow(p, ox, oy, ox-v, oy, '#10b981'); 
+                drawArrow(p, ox, oy, ox-v, oy+u, '#38bdf8'); 
+                p.stroke(255, 50); p.strokeWeight(1);
+                p.drawingContext.setLineDash([3,3]);
+                p.line(ox, oy+u, ox-v, oy+u); p.line(ox-v, oy, ox-v, oy+u);
+                p.drawingContext.setLineDash([]);
+                updateLabelPos(lblU, ox + 15, oy + u/2);
+                if (v !== 0) { lblV.style.display = 'block'; updateLabelPos(lblV, ox - v/2, oy - 15); } 
+                else { lblV.style.display = 'none'; }
+                updateLabelPos(lblRel, ox - v/2 - 15, oy + u/2 + 10);
+            };
+            const updateLabelPos = (el, x, y) => { if(el) { el.style.left = `${x}px`; el.style.top = `${y}px`; } };
+            const drawArrow = (p, x1, y1, x2, y2, col) => {
+                p.stroke(col); p.strokeWeight(2); p.line(x1, y1, x2, y2);
+                const ang = Math.atan2(y2-y1, x2-x1);
+                p.push(); p.translate(x2, y2); p.rotate(ang);
+                p.noStroke(); p.fill(col); p.triangle(0,0, -7,-3, -7,3); p.pop();
+            };
+        };
+
+        new p5(simSketch);
+        new p5(vecSketch);
+
+        // --- UI CONTROLLER ---
+        const dom = {
+            btnG: document.getElementById('btn-mode-ground'),
+            btnO: document.getElementById('btn-mode-observer'),
+            inSpeed: document.getElementById('input-speed'),
+            inRain: document.getElementById('input-rain'),
+            valSpeed: document.getElementById('val-speed'),
+            valRain: document.getElementById('val-rain'),
+            btnTrace: document.getElementById('btn-trace'),
+            traceDot: document.getElementById('trace-dot'),
+            info: document.getElementById('info-text')
+        };
+
+        dom.btnG.onclick = () => setMode('ground');
+        dom.btnO.onclick = () => setMode('observer');
+        dom.inSpeed.oninput = (e) => { state.v = parseFloat(e.target.value); updateUI(); };
+        dom.inRain.oninput = (e) => { state.u = parseFloat(e.target.value); updateUI(); };
+        dom.btnTrace.onclick = () => {
+            state.trace = !state.trace;
+            dom.traceDot.style.background = state.trace ? '#38bdf8' : '#64748b';
+            dom.traceDot.style.boxShadow = state.trace ? '0 0 6px #38bdf8' : 'none';
+        };
+        
+        function setMode(m) {
+            state.mode = m;
+            state.groundOffset = 0;
+            if (m === 'ground') {
+                dom.btnG.classList.add('active');
+                dom.btnO.classList.remove('active');
+            } else {
+                dom.btnO.classList.add('active');
+                dom.btnG.classList.remove('active');
+            }
+            updateUI();
+        }
+
+        // MathJax Queue System
+        let renderQueue = Promise.resolve();
+        function setMathContent(elementId, newHtml) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            renderQueue = renderQueue.then(() => {
+                el.innerHTML = newHtml;
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    return MathJax.typesetPromise([el]);
+                }
+                return Promise.resolve();
+            }).catch(err => console.log('MathJax skip:', err));
+        }
+
+        function renderStaticMath() {
+            setMathContent('lbl-btn-v', '$\\vec{v}$');
+            setMathContent('lbl-v', '$\\vec{v}$');
+            setMathContent('lbl-u', '$\\vec{u}$');
+            renderQueue = renderQueue.then(() => {
+                const ids = ['formula-display', 'v-lbl-u', 'v-lbl-v', 'v-lbl-rel'];
+                const elements = ids.map(id => document.getElementById(id)).filter(e => e);
+                if (window.MathJax && window.MathJax.typesetPromise && elements.length > 0) {
+                    return MathJax.typesetPromise(elements);
+                }
+            });
+        }
+
+        function updateUI() {
+            dom.valSpeed.innerText = state.v;
+            dom.valRain.innerText = state.u;
+            let newText = "";
+            if (state.mode === 'ground') newText = TEXTS.groundMode;
+            else if (state.v === 0) newText = TEXTS.ground;
+            else if (state.v > 0) newText = TEXTS.observerFwd;
+            else newText = TEXTS.observerBack;
+            if (dom.info.innerHTML !== newText) {
+                setMathContent('info-text', newText);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            renderStaticMath();
+            updateUI();
+        });
+    </script>
+</body>
+</html>
