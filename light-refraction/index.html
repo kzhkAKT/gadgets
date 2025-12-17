@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- SNSシェア用の設定 (OGP) -->
+    <meta property="og:title" content="光の屈折と波長シミュレーター">
+    <meta property="og:description" content="異なる媒質を通過する光の速度と波長の変化を可視化したシミュレーターです。">
+    <meta property="og:type" content="website">
+    
+    <title>光の媒質通過シミュレーター</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+            min-height: 100vh;
+        }
+        h1 {
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+        .controls {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box; /* パディングを含めた幅計算 */
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 120px;
+            flex: 1; /* スマートフォンでのレイアウト調整 */
+        }
+        label {
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            font-weight: bold;
+            text-align: center;
+            white-space: nowrap;
+        }
+        input[type=range] {
+            width: 100%;
+            max-width: 140px;
+            cursor: pointer;
+        }
+        .description {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #666;
+            width: 100%;
+            max-width: 800px;
+            line-height: 1.6;
+            box-sizing: border-box;
+            padding: 0 10px;
+        }
+        #canvas-container {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            /* キャンバスのレスポンシブ対応 */
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            justify-content: center;
+            background: #fff;
+        }
+        canvas {
+            display: block; /* キャンバスの下の余白を消す */
+        }
+        .value-display {
+            font-size: 0.9rem;
+            color: #0066cc;
+            font-weight: bold;
+        }
+        /* モバイル向け調整 */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.2rem; }
+            .control-group { min-width: 45%; }
+            body { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>媒質による光の波長・速度変化シミュレーター</h1>
+
+    <div id="canvas-container"></div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>波の右向きの速さ</label>
+            <input type="range" id="speed-slider" min="0.0" max="4.0" step="0.05" value="0.75">
+        </div>
+        <div class="control-group">
+            <label>基本周波数</label>
+            <input type="range" id="freq-slider" min="0.05" max="0.4" step="0.01" value="0.15">
+        </div>
+        
+        <div style="width: 100%; height: 1px; background: #eee; margin: 5px 0;"></div>
+
+        <div class="control-group">
+            <label>媒質1 屈折率 ($n_1$)</label>
+            <input type="range" id="n1-slider" min="1.0" max="3.0" step="0.1" value="1.0">
+            <span id="n1-val" class="value-display">1.0</span>
+        </div>
+        <div class="control-group">
+            <label>媒質2 屈折率 ($n_2$)</label>
+            <input type="range" id="n2-slider" min="1.0" max="3.0" step="0.1" value="1.5">
+            <span id="n2-val" class="value-display">1.5</span>
+        </div>
+        <div class="control-group">
+            <label>媒質3 屈折率 ($n_3$)</label>
+            <input type="range" id="n3-slider" min="1.0" max="3.0" step="0.1" value="2.4">
+            <span id="n3-val" class="value-display">2.4</span>
+        </div>
+    </div>
+
+    <div class="description">
+        <p>
+            <strong>解説:</strong><br>
+            光は屈折率の高い媒質に入ると速度が遅くなり、波長が短くなります。<br>
+            ・<strong>波の右向きの速さ:</strong> 波の進むスピード。<br>
+            ・<strong>周波数:</strong> 波の細かさ（色は変わりません）。<br>
+            濃い色のエリア（高屈折率）で、波の間隔が詰まりゆっくり進む様子を観察してください。
+        </p>
+    </div>
+
+    <script>
+        let n1Slider, n2Slider, n3Slider, freqSlider, speedSlider;
+        let n1Val, n2Val, n3Val;
+        
+        // 媒質の初期設定 (色は動的に計算するため固定色は削除)
+        const zones = [
+            { w: 0.33, n: 1.0 }, 
+            { w: 0.33, n: 1.5 }, 
+            { w: 0.34, n: 2.4 } 
+        ];
+
+        let time = 0;
+
+        function setup() {
+            // コンテナの幅に合わせてキャンバスを作成
+            let containerWidth = min(windowWidth - 40, 800); // パディング分を考慮
+            const canvas = createCanvas(containerWidth, 400);
+            canvas.parent('canvas-container');
+            
+            n1Slider = select('#n1-slider');
+            n2Slider = select('#n2-slider');
+            n3Slider = select('#n3-slider');
+            freqSlider = select('#freq-slider');
+            speedSlider = select('#speed-slider');
+            
+            n1Val = select('#n1-val');
+            n2Val = select('#n2-val');
+            n3Val = select('#n3-val');
+
+            textFont('Helvetica Neue');
+        }
+
+        function windowResized() {
+            // ウィンドウサイズ変更時にキャンバスサイズを調整
+            let containerWidth = min(windowWidth - 40, 800);
+            resizeCanvas(containerWidth, 400);
+        }
+
+        function draw() {
+            background(255);
+
+            zones[0].n = float(n1Slider.value());
+            zones[1].n = float(n2Slider.value());
+            zones[2].n = float(n3Slider.value());
+            const freq = float(freqSlider.value());
+            const simSpeed = float(speedSlider.value());
+
+            n1Val.html(zones[0].n.toFixed(1));
+            n2Val.html(zones[1].n.toFixed(1));
+            n3Val.html(zones[2].n.toFixed(1));
+
+            time += simSpeed;
+
+            noStroke();
+            let currentX = 0;
+            for (let i = 0; i < zones.length; i++) {
+                let z = zones[i];
+                let zoneWidth = width * z.w;
+                
+                // 色設定: 屈折率 n に基づいて決定
+                // n=1.0 (白に近い水色) -> n=3.0 (濃い青)
+                // map関数で n の値を 0.0〜1.0 に正規化
+                let amt = map(z.n, 1.0, 3.0, 0, 1);
+                
+                // lerp関数で色を補間 (RGB)
+                // 低屈折率: (250, 252, 255)
+                // 高屈折率: (100, 180, 255)
+                fill(
+                    lerp(250, 100, amt),
+                    lerp(252, 180, amt),
+                    lerp(255, 255, amt)
+                );
+                
+                rect(currentX, 0, zoneWidth, height);
+
+                if (i > 0) {
+                    stroke(150);
+                    strokeWeight(1);
+                    line(currentX, 0, currentX, height);
+                    noStroke();
+                }
+
+                fill(50);
+                textAlign(LEFT, TOP);
+                textSize(16);
+                text(`n = ${z.n.toFixed(1)}`, currentX + 10, 20);
+                
+                textSize(12);
+                let v = (1 / z.n).toFixed(2);
+                let lambda = (1 / z.n).toFixed(2);
+                text(`速度 v: x${v}`, currentX + 10, 45);
+                text(`波長 λ: x${lambda}`, currentX + 10, 65);
+
+                currentX += zoneWidth;
+            }
+
+            let amplitude = 80;
+            let centerY = height / 2;
+            let spatialScale = 0.4; 
+            let K = freq * spatialScale;
+
+            // 波の描画
+            noFill();
+            stroke(0, 100, 200);
+            strokeWeight(3);
+            beginShape();
+
+            let opticalPath = 0; 
+            let step = 2;
+
+            for (let x = 0; x <= width; x += step) {
+                let currentN = 1.0;
+                let accumulatedW = 0;
+                
+                // ゾーン判定の最適化
+                for(let z of zones) {
+                    let wPx = width * z.w;
+                    if (x < accumulatedW + wPx) {
+                        currentN = z.n;
+                        break;
+                    }
+                    accumulatedW += wPx;
+                }
+                // 最後のピクセル用補正
+                if (x >= width) currentN = zones[zones.length-1].n;
+
+                opticalPath += step * currentN;
+                let phase = time * freq - opticalPath * K; 
+
+                let y = centerY + amplitude * Math.sin(phase);
+                vertex(x, y);
+            }
+            endShape();
+
+            // 粒子の描画（最適化版）
+            noStroke();
+            fill(255, 50, 50);
+
+            let accumulatedOP = 0; 
+            let accumulatedX = 0;  
+
+            for (let i = 0; i < zones.length; i++) {
+                let z = zones[i];
+                let zoneW = width * z.w;
+                let zoneEndX = accumulatedX + zoneW;
+                
+                let phaseStart = time * freq - accumulatedOP * K;
+                let zoneOP = zoneW * z.n;
+                let phaseEnd = time * freq - (accumulatedOP + zoneOP) * K;
+                
+                let minK = Math.ceil((phaseEnd - HALF_PI) / TWO_PI);
+                let maxK = Math.floor((phaseStart - HALF_PI) / TWO_PI);
+
+                for (let k = minK; k <= maxK; k++) {
+                    let targetPhase = k * TWO_PI + HALF_PI;
+                    let xLocal = (phaseStart - targetPhase) / (z.n * K);
+                    let finalX = accumulatedX + xLocal;
+
+                    if (finalX >= accumulatedX - 0.1 && finalX <= zoneEndX + 0.1) {
+                         ellipse(finalX, centerY + amplitude, 10, 10);
+                    }
+                }
+                accumulatedOP += zoneOP;
+                accumulatedX += zoneW;
+            }
+            
+            // 境界線（点線）
+            stroke(0);
+            strokeWeight(1);
+            drawingContext.setLineDash([5, 5]); 
+            let borderX = 0;
+            for(let i=0; i<zones.length-1; i++){
+                borderX += width * zones[i].w;
+                line(borderX, 0, borderX, height);
+            }
+            drawingContext.setLineDash([]); 
+        }
+    </script>
+</body>
+</html>
