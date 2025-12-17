@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物理の仕事：内積シミュレーション</title>
+    <!-- p5.js をCDNから読み込み（GitHub Pagesでも問題なく動作します） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f4f8;
+            font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+        }
+        h1 {
+            font-size: 1.2rem;
+            margin: 10px 0;
+            text-align: center;
+        }
+        #canvas-container {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            /* モバイルでのタッチ操作の暴発を防ぐ */
+            touch-action: none; 
+        }
+        .controls {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .control-group label {
+            width: 100px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+        input[type="range"] {
+            flex-grow: 1;
+            margin: 0 10px;
+            cursor: pointer;
+        }
+        .value-display {
+            width: 50px;
+            text-align: right;
+            font-family: monospace;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: #2563eb;
+        }
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        .math-explanation {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            background: #fffbe6;
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #f59e0b;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>物理の仕事と内積 $W = \vec{F} \cdot \vec{s}$</h1>
+
+    <div id="canvas-container"></div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>力の大きさ |F|</label>
+            <input type="range" id="forceSlider" min="0" max="150" value="100">
+            <span id="forceVal" class="value-display">100</span>
+        </div>
+        <div class="control-group">
+            <label>角度 θ (度)</label>
+            <input type="range" id="angleSlider" min="-90" max="90" value="30">
+            <span id="angleVal" class="value-display">30°</span>
+        </div>
+        
+        <button id="actionBtn">移動開始 (Start)</button>
+
+        <div class="math-explanation">
+            <strong>内積の意味:</strong> 仕事は「移動方向に働いた力の成分」×「移動距離」です。<br>
+            $W = |\vec{F}| |\vec{s}| \cos \theta$
+        </div>
+    </div>
+
+    <script>
+        // グローバル変数
+        let boxPos;
+        let boxSize = 60;
+        let floorY;
+        let startX = 100;
+        let targetDist = 400; // 移動する距離
+        let currentDist = 0;  // 現在の移動距離
+        let isMoving = false;
+        let moveSpeed = 4;
+        
+        // 力のパラメータ
+        let forceMag = 100;
+        let angleDeg = 30;
+        
+        // UI要素
+        let forceSlider, angleSlider, forceVal, angleVal, actionBtn;
+
+        function setup() {
+            // キャンバス設定
+            let canvas = createCanvas(min(windowWidth, 800), 400);
+            canvas.parent('canvas-container');
+            
+            floorY = height - 100;
+            boxPos = createVector(startX, floorY - boxSize/2);
+
+            // UI要素の取得とイベントリスナー設定
+            forceSlider = select('#forceSlider');
+            angleSlider = select('#angleSlider');
+            forceVal = select('#forceVal');
+            angleVal = select('#angleVal');
+            actionBtn = select('#actionBtn');
+
+            forceSlider.input(updateParams);
+            angleSlider.input(updateParams);
+            actionBtn.mousePressed(toggleSimulation);
+
+            // タッチデバイスでのスクロール防止（キャンバス上のみ）
+            canvas.touchStarted(function(e) {
+                // p5.jsのキャンバス内でのタッチイベントのみデフォルト動作を抑制するなどの処理が必要なら記述
+                // 現状はCSSのtouch-action: none;で対応
+            });
+
+            updateParams(); // 初期値反映
+            textSize(16);
+        }
+
+        function updateParams() {
+            if (!isMoving) {
+                forceMag = parseFloat(forceSlider.value());
+                angleDeg = parseFloat(angleSlider.value());
+                forceVal.html(forceMag);
+                angleVal.html(angleDeg + "°");
+            }
+        }
+
+        function toggleSimulation() {
+            if (isMoving) {
+                // リセット
+                resetSim();
+            } else {
+                // スタート
+                isMoving = true;
+                actionBtn.html("リセット (Reset)");
+                forceSlider.attribute('disabled', '');
+                angleSlider.attribute('disabled', '');
+            }
+        }
+
+        function resetSim() {
+            isMoving = false;
+            currentDist = 0;
+            boxPos.x = startX;
+            actionBtn.html("移動開始 (Start)");
+            forceSlider.removeAttribute('disabled');
+            angleSlider.removeAttribute('disabled');
+        }
+
+        function draw() {
+            background(255);
+            
+            // 1. 床の描画
+            drawFloor();
+
+            // 2. グリッドと距離マーカー
+            drawGrid();
+
+            // 3. アニメーション更新
+            if (isMoving) {
+                if (currentDist < targetDist) {
+                    currentDist += moveSpeed;
+                    boxPos.x = startX + currentDist;
+                }
+            }
+
+            // 4. 箱の描画
+            drawBox();
+
+            // 5. ベクトルの計算と描画
+            let angleRad = radians(-angleDeg); // p5jsは時計回りが正なのでマイナスにする
+            let forceVec = p5.Vector.fromAngle(angleRad, forceMag);
+            
+            // 力のベクトル (F)
+            drawArrow(boxPos, forceVec, color(0, 100, 255), "F");
+
+            // 移動ベクトル (s) - 移動中または完了後に表示
+            let sVec = createVector(100, 0); // 表示用の固定長ベクトル
+            if (isMoving || currentDist > 0) {
+                // 実際の移動を示す矢印
+                // drawArrow(createVector(startX, floorY + 20), createVector(currentDist, 0), color(255, 0, 0), "s");
+            }
+
+            // 6. 内積の可視化 (射影)
+            visualizeDotProduct(boxPos, forceVec);
+
+            // 7. 情報パネルの表示
+            drawInfoPanel();
+        }
+
+        function drawFloor() {
+            noStroke();
+            fill(240);
+            rect(0, floorY, width, height - floorY);
+            stroke(100);
+            strokeWeight(2);
+            line(0, floorY, width, floorY);
+        }
+
+        function drawGrid() {
+            stroke(220);
+            strokeWeight(1);
+            for (let x = 0; x < width; x += 50) {
+                line(x, 0, x, height);
+            }
+            
+            // スタート位置とゴール位置
+            stroke(200, 100, 100);
+            line(startX, floorY - 20, startX, floorY + 20);
+            line(startX + targetDist, floorY - 20, startX + targetDist, floorY + 20);
+            
+            fill(100);
+            noStroke();
+            textAlign(CENTER);
+            text("Start", startX, floorY + 40);
+            text("Goal", startX + targetDist, floorY + 40);
+        }
+
+        function drawBox() {
+            fill(255, 200, 100);
+            stroke(0);
+            strokeWeight(2);
+            rectMode(CENTER);
+            rect(boxPos.x, boxPos.y, boxSize, boxSize);
+            
+            fill(0);
+            noStroke();
+            textAlign(CENTER, CENTER);
+            text("m", boxPos.x, boxPos.y);
+        }
+
+        function visualizeDotProduct(origin, vec) {
+            // 成分分解
+            let angleRad = radians(-angleDeg);
+            let fx = vec.x; // F * cos(theta)
+            let fy = vec.y;
+            
+            // 補助線 (点線) - 射影
+            stroke(150, 0, 150);
+            drawingContext.setLineDash([5, 5]);
+            line(origin.x + vec.x, origin.y + vec.y, origin.x + vec.x, origin.y);
+            drawingContext.setLineDash([]); // 点線リセット
+
+            // 水平成分 (有効な仕事をする力)
+            stroke(150, 0, 150);
+            strokeWeight(4);
+            line(origin.x, origin.y, origin.x + fx, origin.y);
+            
+            // ラベル: F cos θ
+            noStroke();
+            fill(150, 0, 150);
+            textAlign(CENTER);
+            text("F cosθ", origin.x + fx/2, origin.y + 20);
+
+            // 角度の円弧
+            noFill();
+            stroke(0);
+            strokeWeight(1);
+            let arcSize = 50;
+            if (vec.mag() > 20) {
+                let startAng = angleDeg >= 0 ? -angleRad : 0;
+                let endAng = angleDeg >= 0 ? 0 : -angleRad;
+                // p5のarcは時計回り
+                arc(origin.x, origin.y, arcSize, arcSize, radians(-angleDeg), 0);
+                // 角度テキスト
+                fill(0);
+                noStroke();
+                text("θ", origin.x + 40, origin.y - (angleDeg > 0 ? 10 : -10));
+            }
+        }
+
+        function drawArrow(base, vec, myColor, label) {
+            push();
+            stroke(myColor);
+            strokeWeight(3);
+            fill(myColor);
+            translate(base.x, base.y);
+            line(0, 0, vec.x, vec.y);
+            rotate(vec.heading());
+            let arrowSize = 7;
+            translate(vec.mag() - arrowSize, 0);
+            triangle(0, arrowSize / 2, 0, -arrowSize / 2, arrowSize, 0);
+            pop();
+
+            // ラベル
+            push();
+            fill(myColor);
+            noStroke();
+            translate(base.x + vec.x * 1.1, base.y + vec.y * 1.1);
+            textAlign(CENTER, CENTER);
+            textStyle(BOLD);
+            text(label, 0, 0);
+            pop();
+        }
+
+        function drawInfoPanel() {
+            fill(255, 255, 255, 200);
+            stroke(200);
+            rectMode(CORNER);
+            rect(10, 10, 320, 130, 5);
+
+            fill(0);
+            noStroke();
+            textAlign(LEFT);
+            textSize(14);
+            textStyle(NORMAL);
+            
+            let cosVal = cos(radians(angleDeg)).toFixed(3);
+            // 実際の物理では力x距離だが、ここではシミュレーション上のピクセル値をスケーリングして表示
+            let work = (forceMag * cosVal * currentDist / 100).toFixed(1); 
+            // 表示用のスケーリング（わかりやすくするため）
+            let displayDist = (currentDist / 100).toFixed(2); 
+
+            text(`力 |F| = ${forceMag}`, 20, 35);
+            text(`変位 |s| = ${displayDist}`, 150, 35);
+            text(`角度 θ = ${angleDeg}°  (cos θ = ${cosVal})`, 20, 60);
+            
+            // 計算式
+            textStyle(BOLD);
+            fill(0, 100, 255);
+            text(`W = |F|・|s|・cos θ`, 20, 90);
+            
+            fill(200, 0, 0);
+            textSize(18);
+            text(`= ${work} J (単位)`, 20, 120);
+            
+            // 状況説明
+            textSize(12);
+            fill(100);
+            textAlign(RIGHT);
+            if(angleDeg == 90 || angleDeg == -90) {
+                 text("仕事はゼロです（直交）", 300, 120);
+            } else if (forceMag == 0) {
+                 text("力が働いていません", 300, 120);
+            }
+        }
+
+        function windowResized() {
+            resizeCanvas(min(windowWidth, 800), 400);
+            floorY = height - 100;
+            if(!isMoving) {
+                 boxPos.y = floorY - boxSize/2;
+            }
+        }
+    </script>
+</body>
+</html>
