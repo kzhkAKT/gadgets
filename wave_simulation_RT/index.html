@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光波の反射・透過シミュレーター</title>
+    <!-- p5.js は必須なのでCDNを使用（軽量なmin版） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <style>
+        /* Base Styles */
+        :root {
+            --bg-dark: #111827;
+            --panel-bg: #1f2937;
+            --panel-border: #374151;
+            --text-main: #ffffff;
+            --text-muted: #9ca3af;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-red: #ef4444;
+            --accent-indigo: #4f46e5;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+
+        /* Container */
+        .container {
+            max-width: 56rem; /* approx 900px */
+            width: 100%;
+            background-color: var(--panel-bg);
+            border-radius: 0.75rem;
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            background-color: #1f2937;
+        }
+
+        .title h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #60a5fa, #67e8f9);
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        .title p {
+            margin: 0.25rem 0 0;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .legend {
+            display: flex;
+            gap: 0.75rem;
+            font-size: 0.75rem;
+            color: #d1d5db;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .dot {
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+        }
+
+        /* Canvas */
+        #canvas-container {
+            position: relative;
+            background-color: #000;
+            width: 100%;
+            height: 400px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        canvas {
+            display: block;
+        }
+
+        /* Controls Section */
+        .controls {
+            padding: 1.5rem;
+            background-color: var(--panel-bg);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Medium Controls Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        @media (min-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .control-box {
+            background-color: rgba(55, 65, 81, 0.5);
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+
+        .control-box.blue { border-left: 4px solid var(--accent-blue); }
+        .control-box.green { border-left: 4px solid var(--accent-green); }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .control-title {
+            font-weight: 600;
+            margin: 0;
+        }
+        .text-blue { color: #60a5fa; }
+        .text-green { color: #4ade80; }
+
+        .value-display {
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* Sliders */
+        input[type="range"] {
+            width: 100%;
+            height: 0.5rem;
+            background: #4b5563;
+            border-radius: 0.5rem;
+            appearance: none;
+            cursor: pointer;
+            outline: none;
+        }
+        
+        /* Custom Range Thumbs (Webkit/Chrome/Safari) */
+        input[type="range"]::-webkit-slider-thumb {
+            appearance: none;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            transition: background .15s ease-in-out;
+        }
+        .control-box.blue input[type="range"]::-webkit-slider-thumb { background: var(--accent-blue); }
+        .control-box.green input[type="range"]::-webkit-slider-thumb { background: var(--accent-green); }
+
+        /* Bottom Controls */
+        .bottom-controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--panel-border);
+            gap: 1rem;
+        }
+
+        .action-group {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        button#btn-toggle {
+            padding: 0.5rem 1.5rem;
+            background-color: var(--accent-indigo);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.3);
+        }
+        button#btn-toggle:hover { background-color: #4338ca; }
+        button#btn-toggle.active { background-color: var(--accent-red); box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3); }
+        button#btn-toggle.active:hover { background-color: #dc2626; }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: rgba(17, 24, 39, 0.5);
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.25rem;
+            border: 1px solid #4b5563;
+        }
+
+        .checkbox-group input {
+            cursor: pointer;
+            width: 1rem; 
+            height: 1rem;
+        }
+        
+        .checkbox-group label {
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: #d1d5db;
+            user-select: none;
+        }
+
+        .info-panel {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            background-color: rgba(17, 24, 39, 0.5);
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            border: 1px solid var(--panel-border);
+        }
+        
+        .info-panel p { margin: 0.25rem 0; }
+
+        /* Explanation */
+        .explanation {
+            max-width: 56rem;
+            width: 100%;
+            margin-top: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+        .explanation strong { color: white; }
+        .explanation ul { margin-top: 0.5rem; padding-left: 1.5rem; }
+        .explanation li { margin-bottom: 0.25rem; }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="title">
+                <h1>光波の反射と透過</h1>
+                <p>屈折率の違いによる波の挙動（$n_1$ vs $n_2$）</p>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <span class="dot" style="background-color: var(--accent-blue);"></span>
+                    <span>入射波</span>
+                </div>
+                <div class="legend-item">
+                    <span class="dot" style="background-color: var(--accent-red);"></span>
+                    <span>反射波</span>
+                </div>
+                <div class="legend-item">
+                    <span class="dot" style="background-color: var(--accent-green);"></span>
+                    <span>透過波</span>
+                </div>
+                <div class="legend-item">
+                    <span class="dot" style="background-color: #fff; border: 1px solid #4b5563;"></span>
+                    <span>合成波</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div id="canvas-container">
+            <!-- p5.js canvas will be inserted here -->
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            
+            <!-- Sliders Grid -->
+            <div class="grid">
+                <!-- Medium 1 Controls -->
+                <div class="control-box blue">
+                    <div class="control-header">
+                        <h3 class="control-title text-blue">媒質 1 (左側)</h3>
+                        <div class="label-group">
+                            <span class="text-sm" style="color:#d1d5db; font-size:0.875rem;">屈折率 $n_1$: </span>
+                            <span id="val-n1" class="value-display">1.0</span>
+                        </div>
+                    </div>
+                    <input type="range" id="slider-n1" min="1.0" max="3.0" step="0.1" value="1.0">
+                </div>
+
+                <!-- Medium 2 Controls -->
+                <div class="control-box green">
+                    <div class="control-header">
+                        <h3 class="control-title text-green">媒質 2 (右側)</h3>
+                        <div class="label-group">
+                            <span class="text-sm" style="color:#d1d5db; font-size:0.875rem;">屈折率 $n_2$: </span>
+                            <span id="val-n2" class="value-display">2.0</span>
+                        </div>
+                    </div>
+                    <input type="range" id="slider-n2" min="1.0" max="3.0" step="0.1" value="2.0">
+                </div>
+            </div>
+
+            <!-- Simulation Controls -->
+            <div class="bottom-controls">
+                <div class="action-group">
+                    <button id="btn-toggle">停止</button>
+                    
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <label for="slider-speed" style="font-size:0.875rem; color:#9ca3af;">速度</label>
+                        <input type="range" id="slider-speed" min="0" max="2" step="0.1" value="1" style="width: 6rem;">
+                    </div>
+
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="chk-combined">
+                        <label for="chk-combined">合成波を表示</label>
+                    </div>
+                </div>
+                
+                <div class="info-panel">
+                    <p>反射係数 $r$: <span id="val-r" class="value-display">0.00</span></p>
+                    <p>透過係数 $t$: <span id="val-t" class="value-display">0.00</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Explanation -->
+    <div class="explanation">
+        <p><strong>解説:</strong></p>
+        <ul>
+            <li><strong>物理的な接続について:</strong> 媒質1の「青い線（入射波）」と媒質2の「緑色の線（透過波）」は、屈折率の違いにより振幅と波長が変わるため、境界でズレて見えます（これが正常な物理現象です）。</li>
+            <li><strong>連続性:</strong> 物理的に境界で滑らかにつながるのは、媒質1の<strong>「合成波（白）」</strong>と媒質2の<strong>「透過波（緑）」</strong>です。「合成波を表示」をONにして確認してください。</li>
+            <li><strong>$n_2 > n_1$ (例: 1.0 vs 2.0):</strong> 境界で<strong>固定端反射</strong>（位相が反転）が生じ、波長が短くなります。</li>
+        </ul>
+    </div>
+
+    <script>
+        // DOM Elements
+        const sliderN1 = document.getElementById('slider-n1');
+        const sliderN2 = document.getElementById('slider-n2');
+        const sliderSpeed = document.getElementById('slider-speed');
+        const chkCombined = document.getElementById('chk-combined');
+        const valN1 = document.getElementById('val-n1');
+        const valN2 = document.getElementById('val-n2');
+        const valR = document.getElementById('val-r');
+        const valT = document.getElementById('val-t');
+        const btnToggle = document.getElementById('btn-toggle');
+
+        // Physics State
+        let n1 = 1.0;
+        let n2 = 2.0;
+        let amplitude = 60;
+        let wavelengthBase = 150; // pixels
+        let time = 0;
+        let isRunning = true;
+        let speedMult = 1.0;
+        let showCombined = false; // Default to false
+
+        // p5.js Sketch
+        const sketch = (p) => {
+            let canvasWidth;
+            let canvasHeight;
+
+            p.setup = () => {
+                const container = document.getElementById('canvas-container');
+                canvasWidth = container.clientWidth;
+                canvasHeight = container.clientHeight;
+                const canvas = p.createCanvas(canvasWidth, canvasHeight);
+                canvas.parent('canvas-container');
+                p.textFont('sans-serif');
+                
+                // Initialize UI values
+                updateValues();
+            };
+
+            p.windowResized = () => {
+                const container = document.getElementById('canvas-container');
+                canvasWidth = container.clientWidth;
+                canvasHeight = container.clientHeight;
+                p.resizeCanvas(canvasWidth, canvasHeight);
+            };
+
+            p.draw = () => {
+                p.background(10, 10, 15); // Deep dark background
+
+                // Calculate center X (Interface)
+                const cx = canvasWidth / 2;
+                const cy = canvasHeight / 2;
+
+                // Draw Medium Backgrounds
+                p.noStroke();
+                // Medium 1 Background
+                p.fill(20, 25, 40);
+                p.rect(0, 0, cx, canvasHeight);
+                // Medium 2 Background (slightly denser look)
+                p.fill(30, 40, 50); 
+                p.rect(cx, 0, cx, canvasHeight);
+
+                // Draw Interface Line
+                p.stroke(100);
+                p.strokeWeight(2);
+                p.line(cx, 0, cx, canvasHeight);
+                
+                // Labels for Mediums
+                p.noStroke();
+                p.fill(150);
+                p.textSize(14);
+                p.textAlign(p.LEFT, p.TOP);
+                p.text(`媒質 1 ($n_1=${n1.toFixed(1)})`, 20, 20);
+                p.text(`媒質 2 ($n_2=${n2.toFixed(1)})`, cx + 20, 20);
+
+
+                // Physics Calculations
+                const freq = 0.003125 * speedMult; 
+                
+                const k1 = (2 * p.PI / wavelengthBase) * n1;
+                const k2 = (2 * p.PI / wavelengthBase) * n2;
+                
+                const omega = freq * wavelengthBase; 
+
+                // Coefficients (Fresnel for normal incidence)
+                const r = (n1 - n2) / (n1 + n2);
+                const t = (2 * n1) / (n1 + n2);
+
+                valR.innerText = r.toFixed(3);
+                valT.innerText = t.toFixed(3);
+
+                // Draw Waves
+                p.noFill();
+                
+                // Drawing resolution (step size in pixels)
+                const step = 1;
+
+                // --- Combined Wave (Medium 1 & 2) ---
+                if (showCombined) {
+                    p.stroke(255);
+                    p.strokeWeight(3);
+                    
+                    // Medium 1 Combined
+                    p.beginShape();
+                    for (let x = 0; x <= cx; x += step) {
+                        const x_phys = x - cx;
+                        const y_inc = amplitude * p.sin(k1 * x_phys - time * omega);
+                        const y_ref = amplitude * r * p.sin(-k1 * x_phys - time * omega);
+                        const y_total = y_inc + y_ref;
+                        p.vertex(x, cy - y_total);
+                    }
+                    // Force vertex at boundary
+                    {
+                        const y_inc = amplitude * p.sin(-time * omega);
+                        const y_ref = amplitude * r * p.sin(-time * omega);
+                        const y_total = y_inc + y_ref;
+                        p.vertex(cx, cy - y_total);
+                    }
+                    p.endShape();
+
+                    // Medium 2 Combined
+                    p.beginShape();
+                    // Start exactly at boundary
+                    {
+                        const y_trans = amplitude * t * p.sin(-time * omega);
+                        p.vertex(cx, cy - y_trans);
+                    }
+                    for (let x = cx; x <= canvasWidth; x += step) {
+                        const x_phys = x - cx;
+                        const y_trans = amplitude * t * p.sin(k2 * x_phys - time * omega);
+                        p.vertex(x, cy - y_trans);
+                    }
+                    // Force vertex at right edge
+                    {
+                        const x = canvasWidth;
+                        const x_phys = x - cx;
+                        const y_trans = amplitude * t * p.sin(k2 * x_phys - time * omega);
+                        p.vertex(x, cy - y_trans);
+                    }
+                    p.endShape();
+                }
+
+                // --- Components (Always Visible) ---
+
+                // Incident
+                p.stroke(59, 130, 246, 200); // Blue vivid
+                p.strokeWeight(2);
+                p.beginShape();
+                for (let x = 0; x <= cx; x += step) {
+                    const x_phys = x - cx;
+                    const y_inc = amplitude * p.sin(k1 * x_phys - time * omega);
+                    p.vertex(x, cy - y_inc);
+                }
+                // Force vertex at boundary
+                {
+                    const y_inc = amplitude * p.sin(-time * omega);
+                    p.vertex(cx, cy - y_inc);
+                }
+                p.endShape();
+
+                // Reflected
+                p.stroke(239, 68, 68, 200); // Red vivid
+                p.strokeWeight(2);
+                p.beginShape();
+                for (let x = 0; x <= cx; x += step) {
+                    const x_phys = x - cx;
+                    const y_ref = amplitude * r * p.sin(-k1 * x_phys - time * omega);
+                    p.vertex(x, cy - y_ref);
+                }
+                // Force vertex at boundary
+                {
+                    const y_ref = amplitude * r * p.sin(-time * omega);
+                    p.vertex(cx, cy - y_ref);
+                }
+                p.endShape();
+
+
+                // Transmitted Component
+                p.stroke(34, 197, 94, 200); // Green vivid
+                p.strokeWeight(2);
+                p.beginShape();
+                // Start exactly at boundary
+                {
+                    const y_trans = amplitude * t * p.sin(-time * omega);
+                    p.vertex(cx, cy - y_trans);
+                }
+                for (let x = cx; x <= canvasWidth; x += step) {
+                    const x_phys = x - cx;
+                    const y_trans = amplitude * t * p.sin(k2 * x_phys - time * omega);
+                    p.vertex(x, cy - y_trans);
+                }
+                // Force vertex at right edge
+                {
+                    const x = canvasWidth;
+                    const x_phys = x - cx;
+                    const y_trans = amplitude * t * p.sin(k2 * x_phys - time * omega);
+                    p.vertex(x, cy - y_trans);
+                }
+                p.endShape();
+
+                // Draw arrows and Labels
+                p.textSize(12);
+                p.textAlign(p.CENTER, p.CENTER);
+                
+                // Incident Label
+                drawArrow(p, cx - 120, cy - 100, 40, 0, p.color(59, 130, 246));
+                p.noStroke();
+                p.fill(59, 130, 246);
+                p.text("入射波", cx - 120, cy - 120);
+
+                // Reflected Label
+                drawArrow(p, cx - 60, cy + 100, 40, p.PI, p.color(239, 68, 68));
+                p.fill(239, 68, 68);
+                p.text("反射波", cx - 60, cy + 120);
+
+                // Transmitted Label
+                drawArrow(p, cx + 100, cy - 100, 40, 0, p.color(34, 197, 94));
+                p.fill(34, 197, 94);
+                p.text("透過波", cx + 100, cy - 120);
+
+                // Update Time
+                if (isRunning) {
+                    time += 0.1;
+                }
+            };
+
+            function drawArrow(p, x, y, len, angle, col) {
+                p.push();
+                p.translate(x, y);
+                p.rotate(angle);
+                p.stroke(col);
+                p.strokeWeight(2);
+                p.fill(col);
+                p.line(-len/2, 0, len/2, 0);
+                p.triangle(len/2, 0, len/2 - 8, -5, len/2 - 8, 5);
+                p.pop();
+            }
+        };
+
+        // Initialize P5
+        new p5(sketch);
+
+        // Event Listeners
+        function updateValues() {
+            n1 = parseFloat(sliderN1.value);
+            n2 = parseFloat(sliderN2.value);
+            speedMult = parseFloat(sliderSpeed.value);
+            showCombined = chkCombined.checked;
+            
+            valN1.textContent = n1.toFixed(1);
+            valN2.textContent = n2.toFixed(1);
+        }
+
+        sliderN1.addEventListener('input', updateValues);
+        sliderN2.addEventListener('input', updateValues);
+        sliderSpeed.addEventListener('input', updateValues);
+        chkCombined.addEventListener('change', updateValues);
+
+        btnToggle.addEventListener('click', () => {
+            isRunning = !isRunning;
+            btnToggle.textContent = isRunning ? "停止" : "再生";
+            btnToggle.classList.toggle('active');
+        });
+
+    </script>
+</body>
+</html>
