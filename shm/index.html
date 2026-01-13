@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="p5.jsを使用した単振動と等速円運動の関係を学ぶためのインタラクティブな物理シミュレーション教材。">
+    <meta property="og:title" content="単振動と等速円運動シミュレーション">
+    <meta property="og:description" content="動かして学ぶ物理。円運動、単振動、グラフの関係を視覚化します。">
+    <meta property="og:type" content="website">
+    
+    <!-- 簡易的なファビコン (円運動のアイコン) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 stroke=%22blue%22 stroke-width=%2210%22 fill=%22none%22/></svg>">
+
+    <title>単振動と等速円運動シミュレーション</title>
+    
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: #f0f4f8; }
+        /* キャンバスのレスポンシブ対応とスタイル */
+        canvas { 
+            display: block; 
+            margin: 0 auto; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            max-width: 100%; /* モバイルではみ出さないように */
+        }
+        .control-panel { background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body class="flex flex-col items-center min-h-screen p-4 pb-12">
+
+    <header class="w-full max-w-4xl mb-6 text-center">
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800 mb-2">単振動と等速円運動の関係</h1>
+        <p class="text-sm md:text-base text-gray-600">等速円運動（左）のy成分が単振動（中央）となり、時間経過で正弦波（右）を描きます。</p>
+    </header>
+
+    <main class="w-full flex flex-col items-center gap-6">
+        <div id="canvas-container" class="w-full max-w-4xl bg-white p-2 rounded-xl shadow-sm flex justify-center overflow-hidden">
+            <!-- p5.js canvas will be inserted here -->
+        </div>
+
+        <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Controls -->
+            <div class="control-panel">
+                <h2 class="font-bold text-lg mb-3 border-b pb-1 text-gray-700">パラメータ操作</h2>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">角速度 (ω): <span id="omega-val">0.5</span> rad/s</label>
+                    <input type="range" id="omega-slider" min="0.1" max="3.0" step="0.1" value="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">振幅 (A): <span id="amp-val">80</span> px</label>
+                    <input type="range" id="amp-slider" min="40" max="100" step="10" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <div class="flex items-center gap-4 mt-4">
+                    <button id="toggle-play" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition shadow-sm">
+                        一時停止
+                    </button>
+                    <button id="reset-sim" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition shadow-sm">
+                        リセット
+                    </button>
+                </div>
+            </div>
+
+            <!-- Display Settings -->
+            <div class="control-panel">
+                <h2 class="font-bold text-lg mb-3 border-b pb-1 text-gray-700">表示設定</h2>
+                <div class="grid grid-cols-2 gap-x-2 gap-y-3">
+                    
+                    <!-- ベクトル -->
+                    <div class="col-span-2 text-xs font-bold text-gray-500 mt-1 uppercase tracking-wide">ベクトル表示</div>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input type="checkbox" id="show-vel" class="form-checkbox text-green-600 h-4 w-4 rounded border-gray-300">
+                        <span class="text-gray-800 text-sm">速度 (<span class="text-green-600 font-bold">v</span>)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input type="checkbox" id="show-acc" class="form-checkbox text-red-500 h-4 w-4 rounded border-gray-300">
+                        <span class="text-gray-800 text-sm">加速度 (<span class="text-red-500 font-bold">a</span>)</span>
+                    </label>
+
+                    <!-- 投影線 -->
+                    <div class="col-span-2 text-xs font-bold text-gray-500 mt-2 border-t pt-2 uppercase tracking-wide">投影線 (点線)</div>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input type="checkbox" id="show-trace-disp" class="form-checkbox text-blue-500 h-4 w-4 rounded border-gray-300" checked>
+                        <span class="text-gray-800 text-sm">変位 y</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input type="checkbox" id="show-trace-vel" class="form-checkbox text-green-600 h-4 w-4 rounded border-gray-300">
+                        <span class="text-gray-800 text-sm">速度 v</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer col-span-2 hover:bg-gray-50 p-1 rounded">
+                        <input type="checkbox" id="show-trace-acc" class="form-checkbox text-red-500 h-4 w-4 rounded border-gray-300">
+                        <span class="text-gray-800 text-sm">加速度 a</span>
+                    </label>
+
+                    <!-- グラフ -->
+                    <div class="col-span-2 text-xs font-bold text-gray-500 mt-2 border-t pt-2 uppercase tracking-wide">グラフ表示</div>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input type="checkbox" id="show-vel-graph" class="form-checkbox text-green-600 h-4 w-4 rounded border-gray-300">
+                        <span class="text-gray-800 text-sm">速度グラフ</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        <input type="checkbox" id="show-acc-graph" class="form-checkbox text-red-500 h-4 w-4 rounded border-gray-300">
+                        <span class="text-gray-800 text-sm">加速度グラフ</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-12 text-center text-gray-500 text-xs">
+        <p>Created with p5.js</p>
+    </footer>
+
+    <script>
+        let omegaSlider, ampSlider;
+        let isPlaying = true;
+        let simTime = 0;
+        let wave = []; // store objects {y, v, a}
+        
+        // Settings
+        let amplitude = 80;
+        let angularVelocity = 0.05;
+        // Default visibility states
+        let showVelocity = false;
+        let showAcceleration = false;
+        
+        // Trace settings
+        let showTraceDisp = true;
+        let showTraceVel = false;
+        let showTraceAcc = false;
+
+        // Graph settings
+        let showVelocityGraph = false;
+        let showAccelerationGraph = false;
+
+        function setup() {
+            const container = document.getElementById('canvas-container');
+            // Make canvas fit the container but keep aspect ratio reasonable
+            const canvasWidth = Math.min(800, container.clientWidth);
+            const canvas = createCanvas(canvasWidth, 350);
+            canvas.parent('canvas-container');
+            
+            // UI bindings
+            omegaSlider = document.getElementById('omega-slider');
+            ampSlider = document.getElementById('amp-slider');
+            
+            omegaSlider.addEventListener('input', (e) => {
+                document.getElementById('omega-val').innerText = parseFloat(e.target.value).toFixed(1);
+            });
+            ampSlider.addEventListener('input', (e) => {
+                document.getElementById('amp-val').innerText = e.target.value;
+            });
+
+            document.getElementById('toggle-play').addEventListener('click', (e) => {
+                isPlaying = !isPlaying;
+                e.target.innerText = isPlaying ? "一時停止" : "再生";
+            });
+
+            document.getElementById('reset-sim').addEventListener('click', () => {
+                simTime = 0;
+                wave = [];
+                isPlaying = true;
+                document.getElementById('toggle-play').innerText = "一時停止";
+            });
+
+            // Vector visibility
+            document.getElementById('show-vel').addEventListener('change', (e) => showVelocity = e.target.checked);
+            document.getElementById('show-acc').addEventListener('change', (e) => showAcceleration = e.target.checked);
+            
+            // Trace visibility
+            document.getElementById('show-trace-disp').addEventListener('change', (e) => showTraceDisp = e.target.checked);
+            document.getElementById('show-trace-vel').addEventListener('change', (e) => showTraceVel = e.target.checked);
+            document.getElementById('show-trace-acc').addEventListener('change', (e) => showTraceAcc = e.target.checked);
+            
+            // Graph visibility
+            document.getElementById('show-vel-graph').addEventListener('change', (e) => showVelocityGraph = e.target.checked);
+            document.getElementById('show-acc-graph').addEventListener('change', (e) => showAccelerationGraph = e.target.checked);
+
+            textFont('sans-serif');
+        }
+
+        function draw() {
+            background(255);
+            
+            // Update parameters from sliders
+            const w_val = parseFloat(omegaSlider.value); // rad/s (visual scale)
+            angularVelocity = w_val * 0.05; // Scale down for animation frame
+            amplitude = parseInt(ampSlider.value);
+
+            if (isPlaying) {
+                simTime += angularVelocity;
+            }
+
+            // Calculations
+            let x = amplitude * cos(simTime);
+            let y = amplitude * sin(simTime); // Displacement
+
+            // Vector components for circle (Calculated regardless of visibility for traces)
+            let vx_c = -y * 0.8;
+            let vy_c = -x * 0.8;
+            let ax_c = -x * 0.8;
+            let ay_c = y * 0.8;
+
+            // 1. Draw Reference Circle (Left)
+            push();
+            translate(120, height / 2);
+            
+            // Circle track
+            noFill();
+            stroke(200);
+            strokeWeight(2);
+            ellipse(0, 0, amplitude * 2);
+            
+            // Axes
+            stroke(230);
+            line(-amplitude - 20, 0, amplitude + 20, 0);
+            line(0, -amplitude - 20, 0, amplitude + 20);
+
+            // Rotating Radius line
+            stroke(100);
+            line(0, 0, x, -y);
+
+            // The Particle on Circle
+            fill(100);
+            noStroke();
+            ellipse(x, -y, 10);
+            
+            // Vectors and Projections
+            
+            // Velocity Vector
+            if (showVelocity) {
+                drawArrow(x, -y, vx_c, vy_c, color(34, 197, 94), 2);
+            }
+            
+            // Velocity Projection Trace
+            if (showTraceVel) {
+                push();
+                stroke(34, 197, 94, 80); // Transparent green
+                drawingContext.setLineDash([3, 3]);
+                let targetX = 200 + 25; // Target is SHM system offset
+                line(x + vx_c, -y + vy_c, targetX, -y + vy_c); 
+                pop();
+            }
+
+            // Acceleration Vector
+            if (showAcceleration) {
+                drawArrow(x, -y, ax_c, ay_c, color(239, 68, 68), 2);
+            }
+
+            // Acceleration Projection Trace
+            if (showTraceAcc) {
+                push();
+                stroke(239, 68, 68, 80); // Transparent red
+                drawingContext.setLineDash([3, 3]);
+                let targetX = 200 - 25; // Target is SHM system offset
+                line(x + ax_c, -y + ay_c, targetX, -y + ay_c); 
+                pop();
+            }
+
+            // Projection Line to SHM (Position)
+            if (showTraceDisp) {
+                stroke(200, 200, 255);
+                drawingContext.setLineDash([5, 5]);
+                line(x, -y, 200, -y);
+                drawingContext.setLineDash([]);
+            }
+            
+            fill(50);
+            noStroke();
+            textAlign(CENTER);
+            text("等速円運動", 0, amplitude + 40);
+
+            // Note: Initial phase 0
+            textSize(11);
+            fill(100);
+            text("※初期位相がない場合", 0, amplitude + 60);
+            
+            pop();
+
+
+            // 2. Draw SHM System (Center)
+            push();
+            translate(320, height / 2);
+            
+            stroke(50);
+            line(-20, -140, 20, -140);
+            
+            let massY = -y;
+            drawSpring(0, -140, 0, massY, 10, 8);
+
+            fill(66, 135, 245);
+            stroke(0);
+            strokeWeight(1);
+            rectMode(CENTER);
+            rect(0, massY, 40, 40);
+            fill(255);
+            textAlign(CENTER, CENTER);
+            noStroke();
+            text("m", 0, massY);
+
+            // Vectors on Mass
+            if (showVelocity) {
+                let vy = -x * 0.8; 
+                drawArrow(25, massY, 0, vy, color(34, 197, 94), 2);
+                fill(34, 197, 94);
+                text("v", 40, massY + vy/2);
+            }
+            if (showAcceleration) {
+                let ay = y * 0.8;
+                drawArrow(-25, massY, 0, ay, color(239, 68, 68), 2);
+                fill(239, 68, 68);
+                text("a", -40, massY + ay/2);
+            }
+
+            // Projection Line to Graph
+            if (showTraceDisp) {
+                stroke(200, 200, 255);
+                drawingContext.setLineDash([5, 5]);
+                line(20, massY, 150, massY);
+                drawingContext.setLineDash([]);
+            }
+
+            stroke(230);
+            line(-30, 0, 30, 0);
+            fill(150);
+            noStroke();
+            text("釣合位置 (0)", 60, 0);
+            
+            fill(50);
+            text("単振動", 0, amplitude + 40);
+            pop();
+
+
+            // 3. Draw Wave Graphs (Right)
+            push();
+            translate(480, height / 2);
+            
+            // Axes
+            stroke(100);
+            line(0, -120, 0, 120);
+            line(0, 0, 300, 0);
+            noStroke();
+            fill(100);
+            text("y, v, a", 20, -120);
+            text("t", 290, 20);
+
+            // Calculate scaled values for graphing
+            let v_plot = x * w_val * 0.6; 
+            let a_plot = -y * w_val * w_val * 0.5;
+
+            // Update Wave Data
+            if (isPlaying) {
+                wave.unshift({y: y, v: v_plot, a: a_plot});
+            }
+            if (wave.length > 300) {
+                wave.pop();
+            }
+
+            // Draw Acceleration Graph (Bottom layer)
+            if (showAccelerationGraph) {
+                noFill();
+                stroke(239, 68, 68, 180); // Red with transparency
+                strokeWeight(2);
+                beginShape();
+                for (let i = 0; i < wave.length; i++) {
+                    vertex(i, -wave[i].a);
+                }
+                endShape();
+            }
+
+            // Draw Velocity Graph (Middle layer)
+            if (showVelocityGraph) {
+                noFill();
+                stroke(34, 197, 94, 180); // Green with transparency
+                strokeWeight(2);
+                beginShape();
+                for (let i = 0; i < wave.length; i++) {
+                    vertex(i, -wave[i].v);
+                }
+                endShape();
+            }
+
+            // Draw Displacement Graph (Top layer - always shown)
+            noFill();
+            stroke(66, 135, 245);
+            strokeWeight(2);
+            beginShape();
+            for (let i = 0; i < wave.length; i++) {
+                vertex(i, -wave[i].y);
+            }
+            endShape();
+
+            // Current point dots
+            noStroke();
+            
+            // Disp dot
+            fill(66, 135, 245);
+            ellipse(0, -y, 8);
+            
+            // Vel dot
+            if (showVelocityGraph) {
+                fill(34, 197, 94);
+                ellipse(0, -v_plot, 6);
+            }
+            // Acc dot
+            if (showAccelerationGraph) {
+                fill(239, 68, 68);
+                ellipse(0, -a_plot, 6);
+            }
+            
+            // Legend
+            textSize(10);
+            textAlign(LEFT);
+            fill(66, 135, 245); text("■ 変位 y", 10, 140);
+            if (showVelocityGraph) { fill(34, 197, 94); text("■ 速度 v", 70, 140); }
+            if (showAccelerationGraph) { fill(239, 68, 68); text("■ 加速度 a", 130, 140); }
+
+            // Title
+            fill(50);
+            textAlign(CENTER);
+            text("単振動の時間変化", 150, amplitude + 40);
+            
+            // Formula display at the top of graph (Dynamic based on visibility)
+            textSize(11);
+            textAlign(CENTER);
+
+            // Displacement (Always visible as reference)
+            fill(66, 135, 245);
+            text("y = A sin(ωt)", 50, -135);
+
+            // Velocity Formula
+            if (showVelocityGraph) {
+                fill(34, 197, 94);
+                text("v = Aω cos(ωt)", 150, -135);
+            }
+
+            // Acceleration Formula
+            if (showAccelerationGraph) {
+                fill(239, 68, 68);
+                text("a = -Aω² sin(ωt)", 250, -135);
+            }
+
+            pop();
+        }
+
+        function drawArrow(x, y, dx, dy, col, thickness) {
+            push();
+            stroke(col);
+            strokeWeight(thickness);
+            fill(col);
+            translate(x, y);
+            line(0, 0, dx, dy);
+            rotate(atan2(dy, dx));
+            let len = mag(dx, dy);
+            translate(len, 0);
+            triangle(0, 0, -6, -3, -6, 3);
+            pop();
+        }
+
+        function drawSpring(x1, y1, x2, y2, segments, width) {
+            push();
+            stroke(80);
+            strokeWeight(1.5);
+            noFill();
+            
+            let dx = x2 - x1;
+            let dy = y2 - y1;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let angle = atan2(dy, dx);
+            
+            translate(x1, y1);
+            rotate(angle);
+            
+            beginShape();
+            vertex(0, 0);
+            for(let i = 1; i < segments; i++) {
+                let x = (dist / segments) * i;
+                let y = (i % 2 === 0 ? -1 : 1) * width;
+                if (i === 1 || i === segments - 1) y = 0;
+                vertex(x, y);
+            }
+            vertex(dist, 0);
+            endShape();
+            pop();
+        }
+        
+        function windowResized() {
+             const container = document.getElementById('canvas-container');
+             resizeCanvas(Math.min(800, container.clientWidth), 350);
+        }
+    </script>
+</body>
+</html>
