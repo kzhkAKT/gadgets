@@ -10,10 +10,10 @@
     <meta property="og:title" content="薄膜干渉シミュレーター">
     <meta property="og:description" content="Webブラウザで動く物理シミュレーション。光の波長や膜の厚さを変えて干渉縞の変化を観察できます。">
     <meta property="og:type" content="website">
-    <meta name="theme-color" content="#1a1a1a">
+    <meta name="theme-color" content="#ffffff">
 
     <!-- Embedded Favicon (Blue Circle) -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%234db8ff%22/></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%23007bff%22/></svg>">
 
     <!-- p5.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
@@ -22,8 +22,8 @@
         body {
             margin: 0;
             padding: 0;
-            background-color: #1a1a1a;
-            color: #eee;
+            background-color: #ffffff; /* 白背景 */
+            color: #333;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             overflow: hidden; /* スクロールバーを隠す */
             touch-action: none; /* モバイルでのスクロール防止 */
@@ -37,32 +37,32 @@
             position: absolute;
             top: 10px;
             left: 10px;
-            background: rgba(0, 0, 0, 0.75); /* 視認性向上のため少し濃く */
+            background: rgba(255, 255, 255, 0.9); /* 白背景（半透明） */
             backdrop-filter: blur(5px); /* 背景をぼかす（対応ブラウザ用） */
             padding: 10px;
             border-radius: 8px;
             width: 200px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); /* 影を柔らかく */
             max-height: 95vh;
             overflow-y: auto;
             font-size: 11px;
             z-index: 10;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 0, 0, 0.1); /* 枠線 */
         }
         /* スクロールバーのカスタマイズ */
         #controls::-webkit-scrollbar {
             width: 6px;
         }
         #controls::-webkit-scrollbar-thumb {
-            background-color: rgba(255,255,255,0.3);
+            background-color: rgba(0,0,0,0.2);
             border-radius: 3px;
         }
         h3 {
             margin-top: 0;
             margin-bottom: 8px;
             font-size: 13px;
-            color: #fff;
-            border-bottom: 1px solid #555;
+            color: #000; /* 黒文字 */
+            border-bottom: 1px solid #ddd;
             padding-bottom: 4px;
         }
         .control-group {
@@ -73,6 +73,7 @@
             justify-content: space-between;
             font-size: 11px;
             margin-bottom: 2px;
+            color: #333;
         }
         input[type=range] {
             width: 100%;
@@ -87,26 +88,26 @@
             height: 14px;
             width: 14px;
             border-radius: 50%;
-            background: #4db8ff;
+            background: #007bff; /* 青 */
             cursor: pointer;
             margin-top: -5px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
         }
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
             height: 4px;
             cursor: pointer;
-            background: #555;
+            background: #ddd; /* 薄いグレー */
             border-radius: 2px;
         }
         .value-display {
             font-weight: bold;
-            color: #4db8ff;
+            color: #0056b3; /* 濃い青 */
             font-family: 'Courier New', monospace; /* 数値を等幅フォントで */
         }
         button {
-            background: #4db8ff;
-            color: #000;
+            background: #007bff;
+            color: #fff;
             border: none;
             padding: 6px 12px;
             border-radius: 4px;
@@ -118,7 +119,7 @@
             touch-action: manipulation; /* タップの遅延をなくす */
         }
         button:hover {
-            background: #3399cc;
+            background: #0056b3;
         }
         button:active {
             transform: translateY(1px);
@@ -126,8 +127,9 @@
         #legend {
             margin-top: 8px;
             font-size: 10px;
-            border-top: 1px solid #555;
+            border-top: 1px solid #ddd;
             padding-top: 6px;
+            color: #555;
         }
         .legend-item {
             display: flex;
@@ -139,21 +141,22 @@
             height: 10px;
             margin-right: 5px;
             border-radius: 2px;
+            border: 1px solid #ccc; /* 境界線追加 */
         }
         .line-box {
             width: 18px;
             height: 0;
             margin-right: 5px;
-            border-top: 2px solid #fff;
+            border-top: 2px solid #555;
         }
         .line-dashed {
-            border-top: 2px dashed #aaa;
+            border-top: 2px dashed #888;
         }
         /* 著作権表示などフッター的なものが必要ならここに追加 */
         .footer {
             margin-top: 10px;
             text-align: center;
-            color: #666;
+            color: #888;
             font-size: 9px;
         }
     </style>
@@ -194,13 +197,14 @@
     </div>
 
     <div id="legend">
-        <div class="legend-item"><div class="color-box" style="background:#fff;"></div>空気 ($n_1=1.0$)</div>
-        <div class="legend-item"><div class="color-box" style="background:rgba(100,200,255,0.3);"></div>薄膜 ($n_2$)</div>
-        <div class="legend-item"><div class="color-box" style="background:#333;"></div>基板 ($n_3$)</div>
-        <div style="margin-top:4px; border-top:1px dashed #555; padding-top:4px;"></div>
-        <div class="legend-item"><div class="line-box" style="border-top: 1px solid #fff; opacity: 0.5;"></div>入射波/膜内光</div>
-        <div class="legend-item"><div class="line-box line-dashed"></div>個別の反射波 (破線)</div>
-        <div class="legend-item"><div class="line-box" style="border-top: 2px solid #fff;"></div>合成波 (実線)</div>
+        <div class="legend-item"><div class="color-box" style="background:#fff; border:1px solid #ccc;"></div>空気 ($n_1=1.0$)</div>
+        <div class="legend-item"><div class="color-box" style="background:rgba(200,230,255,0.5);"></div>薄膜 ($n_2$)</div>
+        <div class="legend-item"><div class="color-box" style="background:linear-gradient(to right, #fff, #555); border:1px solid #ccc;"></div>基板 ($n_3$: 可変)</div>
+        <div style="margin-top:4px; border-top:1px dashed #ccc; padding-top:4px;"></div>
+        <div class="legend-item"><div class="line-box" style="border-top: 1px solid #555; opacity: 0.5;"></div>入射波/膜内光</div>
+        <div class="legend-item"><div class="line-box line-dashed"></div>表面反射波 (破線)</div>
+        <div class="legend-item"><div class="line-box" style="border-top: 2px dashed #888; border-image: repeating-linear-gradient(to right, #888 0, #888 10px, transparent 10px, transparent 15px, #888 15px, #888 17px, transparent 17px, transparent 22px) 1;"></div>透過屈折波 (一点鎖線)</div>
+        <div class="legend-item"><div class="line-box" style="border-top: 2px solid #333;"></div>合成波 (実線)</div>
     </div>
     
     <div class="footer">Built with p5.js</div>
@@ -216,6 +220,9 @@
     const n1 = 1.0; // 空気の屈折率
     let time = 0;   // アニメーション用
     let isPaused = false; // 一時停止フラグ
+
+    // 重要: 物理シミュレーションと描画の整合性を保つための統一スケール
+    const RENDER_SCALE = 0.25; 
 
     function setup() {
         createCanvas(windowWidth, windowHeight);
@@ -241,15 +248,15 @@
         isPaused = !isPaused;
         if (isPaused) {
             pauseButton.html("再生 (Play)");
-            pauseButton.style('background', '#ff9999');
+            pauseButton.style('background', '#ff6666'); // 赤系も見やすく
         } else {
             pauseButton.html("一時停止 (Pause)");
-            pauseButton.style('background', '#4db8ff');
+            pauseButton.style('background', '#007bff');
         }
     }
 
     function draw() {
-        background(20);
+        background(255); // 白背景
 
         // スライダーの値を取得
         const lambda = float(wavelengthSlider.value()); // 波長 (nm)
@@ -270,8 +277,8 @@
         const theta2 = asin(sinTheta2);
 
         // 描画設定（レスポンシブ対応）
+        const visualThickness = d * RENDER_SCALE; 
         const filmTopY = height * 0.45;
-        const visualThickness = d * 0.4; 
         const filmBottomY = filmTopY + visualThickness;
         const centerX = width * 0.45; 
 
@@ -286,24 +293,39 @@
         const exitX = inX + (2 * dx) + (2 * visualOffset);
 
 
-        // --- レイヤーの描画 ---
+        // --- レイヤーの描画 (色をライトモード用に調整) ---
         noStroke();
         
         // テキスト位置は画面幅に応じて調整
         const textOffsetX = (width < 600) ? 120 : 200;
 
-        fill(255, 255, 255, 10);
+        // 空気
+        fill(50); // 文字色：濃いグレー
         text("Air (n=1.0)", centerX - textOffsetX, filmTopY - 10);
         
-        fill(100, 200, 255, 50);
+        // 薄膜 (薄い水色)
+        fill(200, 230, 255, 150);
         rect(0, filmTopY, width, visualThickness);
-        fill(200);
+        fill(100); // 文字色：グレー
         text(`Thin Film (n=${nf(n2, 1, 2)}, d=${d}nm)`, centerX - textOffsetX, filmTopY + 20);
 
-        fill(50, 50, 50);
+        // 基板 (屈折率に応じて色を変える)
+        // n3 = 1.0 -> 白(255)
+        // n3 = 2.5 -> 濃いグレー(50)
+        let subVal = map(n3, 1.0, 2.5, 255, 80); 
+        subVal = constrain(subVal, 50, 255);
+        fill(subVal);
         rect(0, filmBottomY, width, height - filmBottomY);
-        fill(150);
+        
+        fill(50); // 文字色：濃いグレー
         text(`Substrate (n=${nf(n3, 1, 2)})`, centerX - textOffsetX, filmBottomY + 20);
+
+        // 境界線を描く
+        stroke(200);
+        strokeWeight(1);
+        line(0, filmTopY, width, filmTopY);
+        line(0, filmBottomY, width, filmBottomY);
+
 
         // --- 光線の計算と描画 ---
         const lightColor = wavelengthToColor(lambda);
@@ -314,14 +336,14 @@
 
         const rayLen = min(width, height) * 0.4; 
 
-        // 描画パラメータの調整
-        const incidentAlpha = 0.6;
-        const incidentWeight = 1.5;
-        const filmAlpha = 0.25; 
-        const filmWeight = 1.5;
+        // 描画パラメータ (ライトモード用に見やすく濃くする)
+        const incidentAlpha = 0.5; // 少し透明度上げても白背景なら見える
+        const incidentWeight = 2.0; // 少し太く
+        const filmAlpha = 0.3; 
+        const filmWeight = 2.0;
 
         // --- 位相追跡 (Phase Tracking) の開始 ---
-        const visualLambda = lambda * 0.15; 
+        const visualLambda = lambda * RENDER_SCALE; 
         const k_air = TWO_PI / visualLambda;
         
         // 1. 入射光 (Incident Ray 1)
@@ -344,7 +366,8 @@
         push();
         drawingContext.setLineDash([5, 5]); 
         let phase_refl1 = phase_at_surface + phaseShift1;
-        drawWaveRay(inX, filmTopY, reflect1EndX, reflect1EndY, lambda, -theta1, lightColor, phase_refl1, 0.35, 1.5);
+        // 破線は少し濃く
+        drawWaveRay(inX, filmTopY, reflect1EndX, reflect1EndY, lambda, -theta1, lightColor, phase_refl1, 0.5, 2.0);
         pop();
 
         // 3. 屈折光 (Refracted Ray)
@@ -355,7 +378,7 @@
         drawWaveRay(inX, filmTopY, bottomX_in, filmBottomY, lambda * filmWaveScale, -theta2, lightColor, phase_refract, filmAlpha, filmWeight);
 
         const dist_in = dist(inX, filmTopY, bottomX_in, filmBottomY);
-        const visualLambdaFilm = lambda * filmWaveScale * 0.15;
+        const visualLambdaFilm = lambda * filmWaveScale * RENDER_SCALE;
         const k_film = TWO_PI / visualLambdaFilm;
         const phase_at_bottom = phase_refract - k_film * dist_in;
 
@@ -366,7 +389,7 @@
 
         if (visualOffset > 1) {
             push();
-            stroke(255, 30);
+            stroke(150); // ガイド線をグレーに
             strokeWeight(1);
             drawingContext.setLineDash([2, 4]);
             line(bottomX_in, filmBottomY, bottomX_out, filmBottomY);
@@ -389,6 +412,7 @@
         const geometric_phase_lag = k_air * geometric_path_diff;
         
         const phase_incident_at_exit_target = phase_at_surface - geometric_phase_lag;
+        // drawWaveRayは始点からの距離で位相を計算するため、始点での位相を逆算
         const phase2_start = phase_incident_at_exit_target + k_air * dist_inc;
 
         drawWaveRay(incidentStartX2, incidentStartY2, exitX, filmTopY, lambda, theta1, lightColor, phase2_start, incidentAlpha, incidentWeight);
@@ -399,9 +423,10 @@
         
         let phase_refl2 = phase_incident_at_exit_target + phaseShift1;
 
+        // 復活: 2本目の入射光の反射波（点線）を描画
         push();
         drawingContext.setLineDash([5, 5]);
-        drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, phase_refl2, 0.35, 1.5);
+        drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, phase_refl2, 0.5, 2.0);
         drawingContext.setLineDash([]); 
         pop();
         // ------------------------------------
@@ -409,9 +434,10 @@
         // 5. 透過・再放射光 (Reflected Ray 2 - emerging) - 個別の波
         let phase_emerge = phase_at_exit;
 
+        // 変更: 透過・再放射光（Ray 2）を一点鎖線に変更
         push();
-        drawingContext.setLineDash([5, 5]); 
-        drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, phase_emerge, 0.35, 1.5);
+        drawingContext.setLineDash([15, 5, 2, 5]); 
+        drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, phase_emerge, 0.5, 2.0);
         drawingContext.setLineDash([]); 
         pop();
 
@@ -430,6 +456,7 @@
     // 波線を描画する関数
     function drawWaveRay(x1, y1, x2, y2, lambda, angle, col, phaseOffset, alphaScale, weight = 2) {
         push();
+        // 白背景なのでアルファ値はそのまま適用でOK
         stroke(col.r, col.g, col.b, 255 * alphaScale);
         strokeWeight(weight);
         noFill();
@@ -439,22 +466,23 @@
         rotate(rot);
 
         let dist = sqrt(sq(x2 - x1) + sq(y2 - y1));
-        let visualLambda = lambda * 0.15; 
+        // スケール統一
+        let visualLambda = lambda * RENDER_SCALE; 
+        // 振幅を大きく
         let amplitude = 12;
 
         beginShape();
         for (let x = 0; x <= dist; x += 2) {
             let k = TWO_PI / visualLambda;
-            // sin(kx - phase)
             let y = amplitude * sin(k * x - phaseOffset);
             vertex(x, y);
         }
         endShape();
 
-        // 中心線
+        // 中心線 (グレー)
         let currentDash = drawingContext.getLineDash();
         drawingContext.setLineDash([]); 
-        stroke(255, 25 * alphaScale); 
+        stroke(150, 255 * alphaScale); // グレーの中心線
         strokeWeight(1);
         line(0, 0, dist, 0);
         drawingContext.setLineDash(currentDash); 
@@ -465,8 +493,9 @@
     // 合成波を描画する関数
     function drawCompositeWave(x1, y1, x2, y2, lambda, col, phase1, phase2) {
         push();
-        stroke(col.r, col.g, col.b, 230); 
-        strokeWeight(2.5); 
+        // 合成波はくっきりと
+        stroke(col.r, col.g, col.b, 255); 
+        strokeWeight(3.0); // 太く
         noFill();
 
         translate(x1, y1);
@@ -474,7 +503,9 @@
         rotate(rot);
 
         let dist = sqrt(sq(x2 - x1) + sq(y2 - y1));
-        let visualLambda = lambda * 0.15; 
+        // スケール統一
+        let visualLambda = lambda * RENDER_SCALE; 
+        // 合成波の基準振幅も合わせて調整
         let baseAmp = 12; 
         let ampFactor = 0.8;
 
@@ -482,7 +513,6 @@
         for (let x = 0; x <= dist; x += 2) {
             let k = TWO_PI / visualLambda;
             // 合成: Ray 1 + Ray 2
-            // どちらも sin(kx - phase) の形
             let y1_val = (baseAmp * ampFactor) * sin(k * x - phase1);
             let y2_val = (baseAmp * ampFactor) * sin(k * x - phase2);
             let y = y1_val + y2_val;
@@ -490,7 +520,8 @@
         }
         endShape();
 
-        stroke(col.r, col.g, col.b, 50);
+        // 合成波のガイド線
+        stroke(col.r, col.g, col.b, 80);
         strokeWeight(1);
         line(0, 0, dist, 0);
         
@@ -498,7 +529,7 @@
 
         fill(col.r, col.g, col.b);
         noStroke();
-        textSize(10);
+        textSize(11);
         textAlign(LEFT);
         text("合成波", x2 + 5, y2);
     }
@@ -518,8 +549,10 @@
         // 画面が狭い場合、干渉結果BOXの位置を調整
         let boxX, boxY;
         if (width < 600) {
+            // モバイル：右下など邪魔にならない位置へ
             boxX = width - 70;
             boxY = height - 90;
+            // モバイルでは少し小さく表示してもいいが、ここでは位置変更のみ
         } else {
             boxX = width - 80; 
             boxY = 100;
@@ -528,12 +561,13 @@
         push();
         translate(boxX, boxY);
         
-        fill(0, 0, 0, 200);
-        stroke(255);
+        // パネル背景（白半透明）
+        fill(255, 255, 255, 220);
+        stroke(200); // 枠線
         rect(-boxW/2, -20, boxW, boxH, 8);
         
         noStroke();
-        fill(255);
+        fill(50); // 黒文字
         textAlign(CENTER);
         textSize(11);
         text("干渉結果 (Interference)", 0, 0);
@@ -544,6 +578,11 @@
         let circleSize = 60;
         let circleY = 60;
 
+        // 背景円（薄いグレー）
+        fill(240);
+        ellipse(0, circleY, circleSize, circleSize);
+
+        // 結果円
         fill(col.r, col.g, col.b, alpha);
         ellipse(0, circleY, circleSize, circleSize);
         
@@ -554,7 +593,7 @@
             drawingContext.shadowBlur = 0;
         }
 
-        fill(255);
+        fill(50);
         textSize(11);
         let statusText = "";
         if (intensity > 0.9) statusText = "強め合い";
@@ -564,7 +603,7 @@
         text(statusText, 0, circleY + 50);
         
         textSize(9);
-        fill(150);
+        fill(100);
         text(`OPD Δ ≈ ${Math.round(delta)} nm`, 0, circleY + 70);
         text(`反射位相差: ${totalShift * 360}°`, 0, circleY + 82);
         
@@ -576,7 +615,7 @@
     }
 
     function wavelengthToColor(wavelength) {
-        var r, g, b, alpha;
+        var r, g, b;
         if (wavelength >= 380 && wavelength < 440) {
             r = -1 * (wavelength - 440) / (440 - 380);
             g = 0;
