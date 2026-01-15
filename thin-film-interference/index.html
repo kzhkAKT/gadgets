@@ -202,8 +202,7 @@
         <div class="legend-item"><div class="color-box" style="background:linear-gradient(to right, #fff, #555); border:1px solid #ccc;"></div>基板 ($n_3$: 可変)</div>
         <div style="margin-top:4px; border-top:1px dashed #ccc; padding-top:4px;"></div>
         <div class="legend-item"><div class="line-box" style="border-top: 1px solid #555; opacity: 0.5;"></div>入射波/膜内光</div>
-        <div class="legend-item"><div class="line-box line-dashed"></div>表面反射波 (破線)</div>
-        <div class="legend-item"><div class="line-box" style="border-top: 2px dashed #888; border-image: repeating-linear-gradient(to right, #888 0, #888 10px, transparent 10px, transparent 15px, #888 15px, #888 17px, transparent 17px, transparent 22px) 1;"></div>透過屈折波 (一点鎖線)</div>
+        <div class="legend-item"><div class="line-box line-dashed"></div>個別の反射波 (破線)</div>
         <div class="legend-item"><div class="line-box" style="border-top: 2px solid #333;"></div>合成波 (実線)</div>
     </div>
     
@@ -218,6 +217,7 @@
     
     // 定数
     const n1 = 1.0; // 空気の屈折率
+    const WAVE_SPEED = 0.1125; // アニメーション速度 (元の0.15から25%ダウン)
     let time = 0;   // アニメーション用
     let isPaused = false; // 一時停止フラグ
 
@@ -296,7 +296,6 @@
         // --- レイヤーの描画 (色をライトモード用に調整) ---
         noStroke();
         
-        // テキスト位置は画面幅に応じて調整
         const textOffsetX = (width < 600) ? 120 : 200;
 
         // 空気
@@ -331,7 +330,7 @@
         const lightColor = wavelengthToColor(lambda);
         
         if (!isPaused) {
-            time += 0.15;
+            time += WAVE_SPEED;
         }
 
         const rayLen = min(width, height) * 0.4; 
@@ -366,7 +365,7 @@
         push();
         drawingContext.setLineDash([5, 5]); 
         let phase_refl1 = phase_at_surface + phaseShift1;
-        // 破線は少し濃く
+        // 破線
         drawWaveRay(inX, filmTopY, reflect1EndX, reflect1EndY, lambda, -theta1, lightColor, phase_refl1, 0.5, 2.0);
         pop();
 
@@ -423,7 +422,7 @@
         
         let phase_refl2 = phase_incident_at_exit_target + phaseShift1;
 
-        // 復活: 2本目の入射光の反射波（点線）を描画
+        // 表面反射波（点線）
         push();
         drawingContext.setLineDash([5, 5]);
         drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, phase_refl2, 0.5, 2.0);
@@ -434,9 +433,9 @@
         // 5. 透過・再放射光 (Reflected Ray 2 - emerging) - 個別の波
         let phase_emerge = phase_at_exit;
 
-        // 変更: 透過・再放射光（Ray 2）を一点鎖線に変更
+        // 透過・再放射光（点線）
         push();
-        drawingContext.setLineDash([15, 5, 2, 5]); 
+        drawingContext.setLineDash([5, 5]); 
         drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, phase_emerge, 0.5, 2.0);
         drawingContext.setLineDash([]); 
         pop();
