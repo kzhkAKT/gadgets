@@ -270,8 +270,6 @@
         const theta2 = asin(sinTheta2);
 
         // 描画設定（レスポンシブ対応）
-        // 画面幅に応じて中心位置などを微調整することも可能だが、
-        // 基本的にはパーセンテージで配置する
         const filmTopY = height * 0.45;
         const visualThickness = d * 0.4; 
         const filmBottomY = filmTopY + visualThickness;
@@ -314,19 +312,27 @@
             time += 0.15;
         }
 
-        // 光線の長さを画面サイズに合わせて調整
         const rayLen = min(width, height) * 0.4; 
 
+        // 描画パラメータの調整
         const incidentAlpha = 0.6;
         const incidentWeight = 1.5;
-        const filmAlpha = 0.6;
+        const filmAlpha = 0.25; 
         const filmWeight = 1.5;
 
-        // 1. 入射光 (Incident Ray)
+        // --- 位相追跡 (Phase Tracking) の開始 ---
+        const visualLambda = lambda * 0.15; 
+        const k_air = TWO_PI / visualLambda;
+        
+        // 1. 入射光 (Incident Ray 1)
         const incidentStartX = inX - rayLen * sin(theta1);
         const incidentStartY = filmTopY - rayLen * cos(theta1);
         
-        drawWaveRay(incidentStartX, incidentStartY, inX, filmTopY, lambda, theta1, lightColor, time, incidentAlpha, incidentWeight);
+        let phase1 = time;
+        drawWaveRay(incidentStartX, incidentStartY, inX, filmTopY, lambda, theta1, lightColor, phase1, incidentAlpha, incidentWeight);
+
+        const dist_inc = dist(incidentStartX, incidentStartY, inX, filmTopY);
+        const phase_at_surface = phase1 - k_air * dist_inc;
 
         // 2. 上面反射光 (Reflected Ray 1) - 個別の波
         const reflect1EndX = inX + rayLen * sin(theta1);
@@ -337,18 +343,21 @@
 
         push();
         drawingContext.setLineDash([5, 5]); 
-        drawWaveRay(inX, filmTopY, reflect1EndX, reflect1EndY, lambda, -theta1, lightColor, time + phaseShift1, 0.4, 1.5);
+        let phase_refl1 = phase_at_surface + phaseShift1;
+        drawWaveRay(inX, filmTopY, reflect1EndX, reflect1EndY, lambda, -theta1, lightColor, phase_refl1, 0.35, 1.5);
         pop();
 
         // 3. 屈折光 (Refracted Ray)
         const filmWaveScale = 1.0 / n2;
         const bottomX_in = inX + dx;
         
-        drawWaveRay(inX, filmTopY, bottomX_in, filmBottomY, lambda * filmWaveScale, -theta2, lightColor, time, filmAlpha, filmWeight);
+        let phase_refract = phase_at_surface;
+        drawWaveRay(inX, filmTopY, bottomX_in, filmBottomY, lambda * filmWaveScale, -theta2, lightColor, phase_refract, filmAlpha, filmWeight);
 
         const dist_in = dist(inX, filmTopY, bottomX_in, filmBottomY);
         const visualLambdaFilm = lambda * filmWaveScale * 0.15;
-        const phaseLagIn = (dist_in / visualLambdaFilm) * TWO_PI;
+        const k_film = TWO_PI / visualLambdaFilm;
+        const phase_at_bottom = phase_refract - k_film * dist_in;
 
         // 4. 下面反射光 (Reflected Ray inside film - 帰り)
         let phaseShift2 = 0;
@@ -365,34 +374,60 @@
             pop();
         }
 
-        drawWaveRay(bottomX_out, filmBottomY, exitX, filmTopY, lambda * filmWaveScale, theta2, lightColor, time - phaseLagIn + phaseShift2, filmAlpha, filmWeight);
+        let phase_return = phase_at_bottom + phaseShift2;
+        drawWaveRay(bottomX_out, filmBottomY, exitX, filmTopY, lambda * filmWaveScale, theta2, lightColor, phase_return, filmAlpha, filmWeight);
 
-        // 5. 透過・再放射光 (Reflected Ray 2) - 個別の波
+        const dist_out = dist(bottomX_out, filmBottomY, exitX, filmTopY);
+        const phase_at_exit = phase_return - k_film * dist_out;
+
+        // --- 追加: 2本目の入射光 (Ray 1') ---
+        const incidentStartX2 = exitX - rayLen * sin(theta1);
+        const incidentStartY2 = filmTopY - rayLen * cos(theta1);
+        
+        const lateral_dist = exitX - inX;
+        const geometric_path_diff = lateral_dist * sin(theta1);
+        const geometric_phase_lag = k_air * geometric_path_diff;
+        
+        const phase_incident_at_exit_target = phase_at_surface - geometric_phase_lag;
+        const phase2_start = phase_incident_at_exit_target + k_air * dist_inc;
+
+        drawWaveRay(incidentStartX2, incidentStartY2, exitX, filmTopY, lambda, theta1, lightColor, phase2_start, incidentAlpha, incidentWeight);
+        
+        // --- 2本目の入射光の反射波 (Reflection of Ray 1') ---
         const reflect2EndX = exitX + rayLen * sin(theta1);
         const reflect2EndY = filmTopY - rayLen * cos(theta1);
         
-        const opd = 2 * n2 * d * cos(theta2);
-        const phaseLagPath = (2 * PI * opd) / lambda;
-        const totalPhase2 = phaseShift2 + phaseLagPath; 
+        let phase_refl2 = phase_incident_at_exit_target + phaseShift1;
+
+        push();
+        drawingContext.setLineDash([5, 5]);
+        drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, phase_refl2, 0.35, 1.5);
+        drawingContext.setLineDash([]); 
+        pop();
+        // ------------------------------------
+
+        // 5. 透過・再放射光 (Reflected Ray 2 - emerging) - 個別の波
+        let phase_emerge = phase_at_exit;
 
         push();
         drawingContext.setLineDash([5, 5]); 
-        drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, time + totalPhase2, 0.4, 1.5);
+        drawWaveRay(exitX, filmTopY, reflect2EndX, reflect2EndY, lambda, -theta1, lightColor, phase_emerge, 0.35, 1.5);
         drawingContext.setLineDash([]); 
         pop();
 
         // --- 合成波 (Composite Wave) の描画 ---
-        const compStartX = (inX + exitX) / 2;
+        const compStartX = exitX;
         const compStartY = filmTopY;
-        const compEndX = (reflect1EndX + reflect2EndX) / 2;
-        const compEndY = (reflect1EndY + reflect2EndY) / 2;
+        const compEndX = reflect2EndX;
+        const compEndY = reflect2EndY;
 
-        drawCompositeWave(compStartX, compStartY, compEndX, compEndY, lambda, lightColor, time, phaseShift1, totalPhase2);
+        drawCompositeWave(compStartX, compStartY, compEndX, compEndY, lambda, lightColor, phase_refl2, phase_emerge);
 
         // --- 干渉結果の計算と表示 ---
         displayInterferenceResult(lambda, d, n2, n3, theta2, lightColor);
     }
 
+    // 波線を描画する関数
     function drawWaveRay(x1, y1, x2, y2, lambda, angle, col, phaseOffset, alphaScale, weight = 2) {
         push();
         stroke(col.r, col.g, col.b, 255 * alphaScale);
@@ -405,19 +440,21 @@
 
         let dist = sqrt(sq(x2 - x1) + sq(y2 - y1));
         let visualLambda = lambda * 0.15; 
-        let amplitude = 8;
+        let amplitude = 12;
 
         beginShape();
         for (let x = 0; x <= dist; x += 2) {
             let k = TWO_PI / visualLambda;
+            // sin(kx - phase)
             let y = amplitude * sin(k * x - phaseOffset);
             vertex(x, y);
         }
         endShape();
 
+        // 中心線
         let currentDash = drawingContext.getLineDash();
         drawingContext.setLineDash([]); 
-        stroke(255, 30 * alphaScale);
+        stroke(255, 25 * alphaScale); 
         strokeWeight(1);
         line(0, 0, dist, 0);
         drawingContext.setLineDash(currentDash); 
@@ -425,9 +462,10 @@
         pop();
     }
 
-    function drawCompositeWave(x1, y1, x2, y2, lambda, col, t, phase1, phase2) {
+    // 合成波を描画する関数
+    function drawCompositeWave(x1, y1, x2, y2, lambda, col, phase1, phase2) {
         push();
-        stroke(col.r, col.g, col.b, 200); 
+        stroke(col.r, col.g, col.b, 230); 
         strokeWeight(2.5); 
         noFill();
 
@@ -437,14 +475,16 @@
 
         let dist = sqrt(sq(x2 - x1) + sq(y2 - y1));
         let visualLambda = lambda * 0.15; 
-        let baseAmp = 8; 
+        let baseAmp = 12; 
         let ampFactor = 0.8;
 
         beginShape();
         for (let x = 0; x <= dist; x += 2) {
             let k = TWO_PI / visualLambda;
-            let y1_val = (baseAmp * ampFactor) * sin(k * x - t - phase1);
-            let y2_val = (baseAmp * ampFactor) * sin(k * x - t - phase2);
+            // 合成: Ray 1 + Ray 2
+            // どちらも sin(kx - phase) の形
+            let y1_val = (baseAmp * ampFactor) * sin(k * x - phase1);
+            let y2_val = (baseAmp * ampFactor) * sin(k * x - phase2);
             let y = y1_val + y2_val;
             vertex(x, y);
         }
@@ -478,10 +518,8 @@
         // 画面が狭い場合、干渉結果BOXの位置を調整
         let boxX, boxY;
         if (width < 600) {
-            // モバイル：右下など邪魔にならない位置へ
             boxX = width - 70;
             boxY = height - 90;
-            // モバイルでは少し小さく表示してもいいが、ここでは位置変更のみ
         } else {
             boxX = width - 80; 
             boxY = 100;
