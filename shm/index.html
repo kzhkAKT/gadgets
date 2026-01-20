@@ -57,9 +57,15 @@
                     <input type="range" id="amp-slider" min="40" max="100" step="10" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                 </div>
 
+                <div class="mb-4">
+                    <!-- Changed to steps of PI/12 (15 degrees) -->
+                    <label class="block text-sm font-medium text-gray-700 mb-1">初期位相 (α): <span id="alpha-val">0</span></label>
+                    <input type="range" id="alpha-slider" min="0" max="24" step="1" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+
                 <div class="flex items-center gap-4 mt-4">
                     <button id="toggle-play" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition shadow-sm">
-                        一時停止
+                        再生
                     </button>
                     <button id="reset-sim" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition shadow-sm">
                         リセット
@@ -118,14 +124,16 @@
     </footer>
 
     <script>
-        let omegaSlider, ampSlider;
-        let isPlaying = true;
+        let omegaSlider, ampSlider, alphaSlider;
+        let isPlaying = false; // Start paused
         let simTime = 0;
         let wave = []; // store objects {y, v, a}
         
         // Settings
         let amplitude = 80;
         let angularVelocity = 0.05;
+        let initialPhase = 0; // Alpha
+        
         // Default visibility states
         let showVelocity = false;
         let showAcceleration = false;
@@ -139,9 +147,34 @@
         let showVelocityGraph = false;
         let showAccelerationGraph = false;
 
+        // Helper to format fraction of PI for display
+        function formatPiLabel(steps) {
+            if (steps === 0) return "0";
+            if (steps === 24) return "2π (6.28)";
+            
+            // steps corresponds to steps * PI / 12
+            // Simplify fraction steps/12
+            let n = steps;
+            let d = 12;
+            
+            // Greatest common divisor
+            const gcd = (a, b) => b ? gcd(b, a % b) : a;
+            const divisor = gcd(n, d);
+            n /= divisor;
+            d /= divisor;
+            
+            let label = "";
+            if (n !== 1) label += n;
+            label += "π";
+            if (d !== 1) label += "/" + d;
+            
+            // Append numeric value
+            let val = (steps * Math.PI / 12).toFixed(2);
+            return `${label} (${val})`;
+        }
+
         function setup() {
             const container = document.getElementById('canvas-container');
-            // Make canvas fit the container but keep aspect ratio reasonable
             const canvasWidth = Math.min(800, container.clientWidth);
             const canvas = createCanvas(canvasWidth, 350);
             canvas.parent('canvas-container');
@@ -149,12 +182,20 @@
             // UI bindings
             omegaSlider = document.getElementById('omega-slider');
             ampSlider = document.getElementById('amp-slider');
+            alphaSlider = document.getElementById('alpha-slider');
             
             omegaSlider.addEventListener('input', (e) => {
                 document.getElementById('omega-val').innerText = parseFloat(e.target.value).toFixed(1);
             });
             ampSlider.addEventListener('input', (e) => {
                 document.getElementById('amp-val').innerText = e.target.value;
+            });
+            alphaSlider.addEventListener('input', (e) => {
+                const steps = parseInt(e.target.value);
+                document.getElementById('alpha-val').innerText = formatPiLabel(steps);
+                
+                // Clear wave history when changing phase while paused to avoid weird drawing artifacts
+                if (!isPlaying) wave = [];
             });
 
             document.getElementById('toggle-play').addEventListener('click', (e) => {
@@ -165,8 +206,8 @@
             document.getElementById('reset-sim').addEventListener('click', () => {
                 simTime = 0;
                 wave = [];
-                isPlaying = true;
-                document.getElementById('toggle-play').innerText = "一時停止";
+                isPlaying = false; // Pause on reset
+                document.getElementById('toggle-play').innerText = "再生";
             });
 
             // Vector visibility
@@ -192,20 +233,26 @@
             const w_val = parseFloat(omegaSlider.value); // rad/s (visual scale)
             angularVelocity = w_val * 0.05; // Scale down for animation frame
             amplitude = parseInt(ampSlider.value);
+            
+            // Calculate alpha from steps (0-24 -> 0-2PI)
+            let alphaSteps = parseInt(alphaSlider.value);
+            initialPhase = alphaSteps * PI / 12;
 
             if (isPlaying) {
                 simTime += angularVelocity;
             }
 
-            // Calculations
-            let x = amplitude * cos(simTime);
-            let y = amplitude * sin(simTime); // Displacement
+            // Calculations with Phase
+            let currentPhase = simTime + initialPhase;
+            let x = amplitude * cos(currentPhase);
+            let y = amplitude * sin(currentPhase); // Displacement
 
-            // Vector components for circle (Calculated regardless of visibility for traces)
-            let vx_c = -y * 0.8;
-            let vy_c = -x * 0.8;
+            // Vector components for circle
+            let vx_c = -y * 0.8; 
+            let vy_c = -x * 0.8; 
             let ax_c = -x * 0.8;
             let ay_c = y * 0.8;
+
 
             // 1. Draw Reference Circle (Left)
             push();
@@ -275,11 +322,6 @@
             noStroke();
             textAlign(CENTER);
             text("等速円運動", 0, amplitude + 40);
-
-            // Note: Initial phase 0
-            textSize(11);
-            fill(100);
-            text("※初期位相がない場合", 0, amplitude + 60);
             
             pop();
 
@@ -357,7 +399,11 @@
             // Update Wave Data
             if (isPlaying) {
                 wave.unshift({y: y, v: v_plot, a: a_plot});
+            } else if (wave.length === 0) {
+                // Initial point for paused state
+                wave.push({y: y, v: v_plot, a: a_plot});
             }
+            
             if (wave.length > 300) {
                 wave.pop();
             }
@@ -430,20 +476,20 @@
             textSize(11);
             textAlign(CENTER);
 
-            // Displacement (Always visible as reference)
+            // Displacement Formula (Updated with Alpha)
             fill(66, 135, 245);
-            text("y = A sin(ωt)", 50, -135);
+            text("y = A sin(ωt + α)", 50, -135);
 
             // Velocity Formula
             if (showVelocityGraph) {
                 fill(34, 197, 94);
-                text("v = Aω cos(ωt)", 150, -135);
+                text("v = Aω cos(ωt + α)", 150, -135);
             }
 
             // Acceleration Formula
             if (showAccelerationGraph) {
                 fill(239, 68, 68);
-                text("a = -Aω² sin(ωt)", 250, -135);
+                text("a = -Aω² sin(ωt + α)", 250, -135);
             }
 
             pop();
