@@ -9,3 +9,4 @@ Javascript Gadgets Data Repository
 1. https://kzhkakt.github.io/gadgets/shm
 1. https://kzhkakt.github.io/gadgets/thin-film-interference
 1. https://kzhkakt.github.io/gadgets/wave_simulation_RT
+1. https://kzhkakt.github.io/gadgets/water-reflection-sim/
