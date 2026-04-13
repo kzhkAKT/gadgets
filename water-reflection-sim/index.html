@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>水面反射の仕組み（側面図）</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f0fdf4;
+        }
+        canvas {
+            display: block;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 text-gray-800 flex justify-center items-start">
+
+    <div class="max-w-6xl w-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col xl:flex-row">
+        
+        <!-- 左側：キャンバスエリア -->
+        <div class="bg-gray-50 p-4 lg:p-6 flex justify-center items-center relative">
+            <div id="canvas-container"></div>
+            <!-- ドラッグヒント -->
+            <div class="absolute top-8 left-8 text-sm font-bold text-gray-400 opacity-70 pointer-events-none">
+                ※ 物体と目をドラッグして動かせます
+            </div>
+        </div>
+
+        <!-- 右側：コントロールパネル -->
+        <div class="p-6 lg:p-8 flex-1 flex flex-col justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-emerald-800 mb-2">水面反射の仕組み（側面図）</h1>
+                <p class="text-sm text-gray-600 mb-6 border-b pb-4 leading-relaxed">
+                    物体を正面からではなく、<strong>真横（側面）</strong>から見たシミュレーションです。<br>
+                    乱反射した光の一部が水面で反射し、目に届くことで「逆さの像」が見える仕組みを観察しましょう。
+                </p>
+
+                <div class="space-y-4">
+                    <h3 class="font-semibold text-gray-700">表示の切り替え</h3>
+                    
+                    <!-- オプション1: 乱反射 -->
+                    <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                        <input type="checkbox" id="chk-scatter" checked
+                            class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                        <div>
+                            <span class="block text-gray-800 font-medium">乱反射（散乱光）を表示</span>
+                            <span class="block text-xs text-gray-500">物体表面の各点からは、光が四方八方に散乱しています。</span>
+                        </div>
+                    </label>
+
+                    <!-- オプション2: 経路 -->
+                    <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                        <input type="checkbox" id="chk-path" checked
+                            class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                        <div>
+                            <span class="block text-gray-800 font-medium">目に届く光の経路（実線）</span>
+                            <span class="block text-xs text-gray-500">散乱光のうち、水面で正反射して目に入る特定の光線です。</span>
+                        </div>
+                    </label>
+
+                    <!-- オプション3: 延長線 -->
+                    <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                        <input type="checkbox" id="chk-extend" checked
+                            class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                        <div>
+                            <span class="block text-gray-800 font-medium">光の直進経路の錯覚（破線）</span>
+                            <span class="block text-xs text-gray-500">脳は光が曲がったことを認識できず、真っ直ぐ来たように錯覚します。</span>
+                        </div>
+                    </label>
+
+                    <!-- オプション4: 虚像 -->
+                    <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                        <input type="checkbox" id="chk-virtual" checked
+                            class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                        <div>
+                            <span class="block text-gray-800 font-medium">虚像（逆さの像）</span>
+                            <span class="block text-xs text-gray-500">延長線が結ばれる位置に、実際の物体と同じ大きさの像が見えます。</span>
+                        </div>
+                    </label>
+
+                    <!-- オプション5: 法線 -->
+                    <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                        <input type="checkbox" id="chk-normal" checked
+                            class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                        <span class="text-gray-700 font-medium">反射点に法線と角度（入射角・反射角）を表示</span>
+                    </label>
+
+                    <!-- オプション6: 直接光 -->
+                    <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition mt-2 border-t pt-4">
+                        <input type="checkbox" id="chk-direct" checked
+                            class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                        <div>
+                            <span class="block text-gray-800 font-medium">物体から直接目に届く光</span>
+                            <span class="block text-xs text-gray-500">実像を見るための光です（薄い線で描画）。</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 解説セクション -->
+            <div class="mt-8 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                <h3 class="font-bold text-emerald-800 mb-2">💡 なぜ上下逆さまになるの？</h3>
+                <p class="text-sm text-gray-700 leading-relaxed">
+                    物体の<strong>上端（赤色）</strong>から出た光は、手前の水面で反射して目に入ります。そのため、延長線上では<strong>深い位置</strong>にあるように見えます。<br>
+                    逆に<strong>下端（青色）</strong>から出た光は、奥の水面で反射するため、<strong>浅い位置</strong>にあるように見えます。この位置関係の逆転が、像を逆さまに見せています。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // シミュレーションの状態変数
+        let obj;
+        let eye;
+        let waterLevel = 350;
+        let isDraggingObj = false;
+        let isDraggingEye = false;
+        let dragOffset = { x: 0, y: 0 };
+
+        function setup() {
+            let canvas = createCanvas(700, 500);
+            canvas.parent('canvas-container');
+            
+            // 物体の初期位置 (x, y は上端の中央、h は高さ)
+            obj = { x: 150, y: 150, w: 40, h: 120 };
+            
+            // 目の初期位置
+            eye = { x: 600, y: 120, r: 20 };
+        }
+
+        function draw() {
+            // 背景（空気中）
+            background(230, 245, 255); 
+
+            // UIの状態を取得
+            let showScatter = document.getElementById('chk-scatter').checked;
+            let showPath    = document.getElementById('chk-path').checked;
+            let showExtend  = document.getElementById('chk-extend').checked;
+            let showVirtual = document.getElementById('chk-virtual').checked;
+            let showNormal  = document.getElementById('chk-normal').checked;
+            let showDirect  = document.getElementById('chk-direct').checked;
+
+            // 虚像の描画
+            if (showVirtual) {
+                drawTargetObject(obj.x, 2 * waterLevel - obj.y, obj.h, 80, true);
+            }
+
+            // 物体の上端と下端の座標
+            let ptTop = { x: obj.x, y: obj.y };
+            let ptBot = { x: obj.x, y: obj.y + obj.h };
+            
+            let colorTop = color(220, 50, 50);
+            let colorBot = color(30, 100, 220);
+
+            // 直接目に届く光の描画（反射の前に行うことで重なりの見た目を調整）
+            if (showDirect) {
+                drawDirectRay(ptBot, eye, colorBot);
+                drawDirectRay(ptTop, eye, colorTop);
+            }
+
+            // 反射光線の描画（下端：青、上端：赤）
+            drawRaySystem(ptBot, eye, waterLevel, colorBot, showScatter, showPath, showExtend, showNormal);
+            drawRaySystem(ptTop, eye, waterLevel, colorTop, showScatter, showPath, showExtend, showNormal);
+
+            // 水面下の表現（半透明の青）
+            fill(40, 130, 190, 140);
+            noStroke();
+            rect(0, waterLevel, width, height - waterLevel);
+
+            // 水面の境界線
+            stroke(255);
+            strokeWeight(3);
+            line(0, waterLevel, width, waterLevel);
+
+            // 実像の描画
+            drawTargetObject(obj.x, obj.y, obj.h, 255, false);
+
+            // 目の描画
+            drawEyeIcon(eye.x, eye.y);
+
+            // インタラクション（マウスカーソル）
+            if (isMouseOverObj() || isMouseOverEye()) {
+                cursor((isDraggingObj || isDraggingEye) ? 'grabbing' : 'grab');
+            } else {
+                cursor('default');
+            }
+        }
+
+        // --- 描画関数 ---
+
+        // 物体（矢印型）の描画
+        function drawTargetObject(x, y, h, alpha, isFlipped) {
+            push();
+            translate(x, y);
+            
+            // 虚像の場合はY軸を反転して描画（下端基準になるため調整が必要）
+            if (isFlipped) {
+                scale(1, -1);
+            }
+
+            noStroke();
+            
+            // 下部 (青い四角)
+            fill(30, 100, 220, alpha);
+            rect(-15, h/2, 30, h/2);
+            
+            // 中央 (接続部)
+            fill(250, 200, 50, alpha);
+            rect(-5, h/2 - 5, 10, 10);
+
+            // 上部 (赤い三角)
+            fill(220, 50, 50, alpha);
+            triangle(0, 0, -25, h/2, 25, h/2);
+
+            pop();
+        }
+
+        // 観測者の目アイコンの描画
+        function drawEyeIcon(x, y) {
+            push();
+            translate(x, y);
+            
+            // 目の輪郭
+            fill(255);
+            stroke(50);
+            strokeWeight(2);
+            beginShape();
+            vertex(-30, 0);
+            quadraticVertex(0, -20, 30, 0);
+            quadraticVertex(0, 20, -30, 0);
+            endShape(CLOSE);
+            
+            // 瞳 (物体の方を向くように少し左下に寄せる)
+            noStroke();
+            fill(40, 150, 80);
+            circle(-8, 3, 16); // 虹彩
+            fill(20);
+            circle(-8, 3, 8);  // 瞳孔
+            fill(255);
+            circle(-11, 0, 4); // ハイライト
+
+            pop();
+        }
+
+        // 物体から直接目に向かう光線を描画
+        function drawDirectRay(pt, eyePt, baseColor) {
+            // 透明度を下げて薄い光線にする（アルファ値を80に設定）
+            let c = color(red(baseColor), green(baseColor), blue(baseColor), 80);
+            stroke(c);
+            strokeWeight(2);
+            drawArrowLine(pt.x, pt.y, eyePt.x, eyePt.y, c);
+        }
+
+        // 光線システム一式の計算と描画
+        function drawRaySystem(pt, eyePt, waterY, baseColor, showScatter, showPath, showExtend, showNormal) {
+            // 1. 虚像の点 (水面を軸に対称)
+            let ptVirt = { x: pt.x, y: 2 * waterY - pt.y };
+            
+            // 2. 反射点の計算 (目と虚像を結ぶ直線と水面の交点)
+            let t = (waterY - eyePt.y) / (ptVirt.y - eyePt.y);
+            let rx = eyePt.x + t * (ptVirt.x - eyePt.x);
+            let refPt = { x: rx, y: waterY };
+            
+            // 3. 散乱光 (乱反射) のアニメーション描画
+            if (showScatter) {
+                let c = color(red(baseColor), green(baseColor), blue(baseColor), 80);
+                stroke(c);
+                strokeWeight(1.5);
+                let numRays = 16;
+                let raySpeed = 1.5;
+                
+                for(let i = 0; i < numRays; i++) {
+                    let angle = TWO_PI * i / numRays;
+                    // アニメーションオフセット
+                    let offset = (frameCount * raySpeed + i * 15) % 40; 
+                    let rayLen = 15;
+                    
+                    // 物体の中に向けて光が飛ばないよう、簡易的に外側へ向かう線を描画
+                    let x1 = pt.x + cos(angle) * offset;
+                    let y1 = pt.y + sin(angle) * offset;
+                    let x2 = pt.x + cos(angle) * (offset + rayLen);
+                    let y2 = pt.y + sin(angle) * (offset + rayLen);
+                    line(x1, y1, x2, y2);
+                }
+            }
+            
+            // 4. 法線と角度
+            if (showNormal) {
+                // 法線（水面下にも少し伸ばす）
+                stroke(120, 150);
+                strokeWeight(1.5);
+                drawingContext.setLineDash([4, 4]);
+                line(refPt.x, waterY - 100, refPt.x, waterY + 40);
+                drawingContext.setLineDash([]);
+
+                // 入射角・反射角の円弧（アーク）
+                let aIn = atan2(pt.y - refPt.y, pt.x - refPt.x);
+                let aOut = atan2(eyePt.y - refPt.y, eyePt.x - refPt.x);
+                let aNorm = -PI / 2;
+                let arcDiameter = 60; // アークの直径
+
+                noFill();
+                stroke(red(baseColor), green(baseColor), blue(baseColor), 180);
+                strokeWeight(1.5);
+                
+                // 入射角（法線より左側）
+                arc(refPt.x, refPt.y, arcDiameter, arcDiameter, aIn, aNorm);
+                // 反射角（法線より右側）
+                arc(refPt.x, refPt.y, arcDiameter, arcDiameter, aNorm, aOut);
+            }
+
+            // 5. 延長線 (脳が認識する視線)
+            if (showExtend) {
+                let c = color(red(baseColor), green(baseColor), blue(baseColor), 180);
+                stroke(c);
+                strokeWeight(2);
+                drawingContext.setLineDash([6, 6]);
+                line(eyePt.x, eyePt.y, ptVirt.x, ptVirt.y);
+                drawingContext.setLineDash([]);
+            }
+
+            // 6. 目に届く光の経路 (実線と矢印)
+            if (showPath) {
+                let c = color(red(baseColor), green(baseColor), blue(baseColor), 255);
+                stroke(c);
+                strokeWeight(3);
+                
+                // 物体から反射点へ
+                drawArrowLine(pt.x, pt.y, refPt.x, refPt.y, c);
+                // 反射点から目へ
+                drawArrowLine(refPt.x, refPt.y, eyePt.x, eyePt.y, c);
+            }
+        }
+
+        // 矢印付きの線を描画するユーティリティ
+        function drawArrowLine(x1, y1, x2, y2, col) {
+            line(x1, y1, x2, y2);
+            
+            // 線の中間に矢印を描画
+            let mx = (x1 + x2) / 2;
+            let my = (y1 + y2) / 2;
+            let angle = atan2(y2 - y1, x2 - x1);
+            
+            push();
+            translate(mx, my);
+            rotate(angle);
+            fill(col);
+            noStroke();
+            let arrowSize = 6;
+            triangle(0, 0, -arrowSize*2, -arrowSize, -arrowSize*2, arrowSize);
+            pop();
+        }
+
+        // --- マウスインタラクション ---
+
+        function isMouseOverObj() {
+            return mouseX > obj.x - 25 && mouseX < obj.x + 25 && 
+                   mouseY > obj.y && mouseY < obj.y + obj.h;
+        }
+
+        function isMouseOverEye() {
+            return dist(mouseX, mouseY, eye.x, eye.y) < eye.r * 1.5;
+        }
+
+        function mousePressed() {
+            if (isMouseOverObj()) {
+                isDraggingObj = true;
+                dragOffset.x = obj.x - mouseX;
+                dragOffset.y = obj.y - mouseY;
+            } else if (isMouseOverEye()) {
+                isDraggingEye = true;
+                dragOffset.x = eye.x - mouseX;
+                dragOffset.y = eye.y - mouseY;
+            }
+        }
+
+        function mouseDragged() {
+            if (isDraggingObj) {
+                obj.x = mouseX + dragOffset.x;
+                obj.y = mouseY + dragOffset.y;
+                
+                // 制約 (目は物体より右、水面より上)
+                obj.x = constrain(obj.x, 30, eye.x - 100);
+                obj.y = constrain(obj.y, 20, waterLevel - obj.h - 10);
+            } else if (isDraggingEye) {
+                eye.x = mouseX + dragOffset.x;
+                eye.y = mouseY + dragOffset.y;
+                
+                // 制約
+                eye.x = constrain(eye.x, obj.x + 100, width - 30);
+                eye.y = constrain(eye.y, 20, waterLevel - 20);
+            }
+        }
+
+        function mouseReleased() {
+            isDraggingObj = false;
+            isDraggingEye = false;
+        }
+
+    </script>
+</body>
+</html>
