@@ -19,27 +19,30 @@
             display: block;
             border-radius: 0.5rem;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 7 / 5;
         }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-8 text-gray-800 flex justify-center items-start">
+<body class="min-h-screen p-2 md:p-8 text-gray-800 flex justify-center items-start">
 
     <div class="max-w-6xl w-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col xl:flex-row">
         
         <!-- 左側：キャンバスエリア -->
-        <div class="bg-gray-50 p-4 lg:p-6 flex justify-center items-center relative">
-            <div id="canvas-container"></div>
+        <div class="bg-gray-50 p-2 md:p-4 lg:p-6 flex justify-center items-center relative w-full overflow-hidden">
+            <div id="canvas-container" class="w-full max-w-[700px]"></div>
             <!-- ドラッグヒント -->
-            <div class="absolute top-8 left-8 text-sm font-bold text-gray-400 opacity-70 pointer-events-none">
+            <div class="absolute top-4 left-4 md:top-8 md:left-8 text-xs md:text-sm font-bold text-gray-400 opacity-70 pointer-events-none">
                 ※ 物体と目をドラッグして動かせます
             </div>
         </div>
 
         <!-- 右側：コントロールパネル -->
-        <div class="p-6 lg:p-8 flex-1 flex flex-col justify-between">
+        <div class="p-4 md:p-6 lg:p-8 flex-1 flex flex-col justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-emerald-800 mb-2">水面反射の仕組み（側面図）</h1>
-                <p class="text-sm text-gray-600 mb-6 border-b pb-4 leading-relaxed">
+                <h1 class="text-xl md:text-2xl font-bold text-emerald-800 mb-2">水面反射の仕組み（側面図）</h1>
+                <p class="text-xs md:text-sm text-gray-600 mb-4 md:mb-6 border-b pb-4 leading-relaxed">
                     物体を正面からではなく、<strong>真横（側面）</strong>から見たシミュレーションです。<br>
                     乱反射した光の一部が水面で反射し、目に届くことで「逆さの像」が見える仕組みを観察しましょう。
                 </p>
@@ -47,72 +50,69 @@
                 <div class="space-y-4">
                     <h3 class="font-semibold text-gray-700">表示の切り替え</h3>
                     
-                    <!-- オプション1: 乱反射 -->
-                    <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
-                        <input type="checkbox" id="chk-scatter" checked
-                            class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
-                        <div>
-                            <span class="block text-gray-800 font-medium">乱反射（散乱光）を表示</span>
-                            <span class="block text-xs text-gray-500">物体表面の各点からは、光が四方八方に散乱しています。</span>
-                        </div>
-                    </label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-2 md:gap-4">
+                        <!-- オプション1: 乱反射 -->
+                        <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                            <input type="checkbox" id="chk-scatter"
+                                class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                            <div>
+                                <span class="block text-gray-800 font-medium text-sm md:text-base">乱反射（散乱光）を表示</span>
+                                <span class="block text-[10px] md:text-xs text-gray-500">物体表面の各点からは、光が四方八方に散乱しています。</span>
+                            </div>
+                        </label>
 
-                    <!-- オプション2: 経路 -->
-                    <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
-                        <input type="checkbox" id="chk-path" checked
-                            class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
-                        <div>
-                            <span class="block text-gray-800 font-medium">目に届く光の経路（実線）</span>
-                            <span class="block text-xs text-gray-500">散乱光のうち、水面で正反射して目に入る特定の光線です。</span>
-                        </div>
-                    </label>
+                        <!-- オプション2: 経路 -->
+                        <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                            <input type="checkbox" id="chk-path"
+                                class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                            <div>
+                                <span class="block text-gray-800 font-medium text-sm md:text-base">目に届く光の経路（実線）</span>
+                                <span class="block text-[10px] md:text-xs text-gray-500">散乱光のうち、水面で正反射して目に入る特定の光線です。</span>
+                            </div>
+                        </label>
 
-                    <!-- オプション3: 延長線 -->
-                    <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
-                        <input type="checkbox" id="chk-extend" checked
-                            class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
-                        <div>
-                            <span class="block text-gray-800 font-medium">光の直進経路の錯覚（破線）</span>
-                            <span class="block text-xs text-gray-500">脳は光が曲がったことを認識できず、真っ直ぐ来たように錯覚します。</span>
-                        </div>
-                    </label>
+                        <!-- オプション3: 延長線 -->
+                        <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                            <input type="checkbox" id="chk-extend"
+                                class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                            <div>
+                                <span class="block text-gray-800 font-medium text-sm md:text-base">光の直進経路の錯覚（破線）</span>
+                                <span class="block text-[10px] md:text-xs text-gray-500">脳は光が曲がったことを認識できず、真っ直ぐ来たように錯覚します。</span>
+                            </div>
+                        </label>
 
-                    <!-- オプション4: 虚像 -->
-                    <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
-                        <input type="checkbox" id="chk-virtual" checked
-                            class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
-                        <div>
-                            <span class="block text-gray-800 font-medium">虚像（逆さの像）</span>
-                            <span class="block text-xs text-gray-500">延長線が結ばれる位置に、実際の物体と同じ大きさの像が見えます。</span>
-                        </div>
-                    </label>
+                        <!-- オプション4: 虚像 -->
+                        <label class="flex items-start space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                            <input type="checkbox" id="chk-virtual" checked
+                                class="mt-1 w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                            <div>
+                                <span class="block text-gray-800 font-medium text-sm md:text-base">虚像（逆さの像）</span>
+                                <span class="block text-[10px] md:text-xs text-gray-500">延長線が結ばれる位置に、実際の物体と同じ大きさの像が見えます。</span>
+                            </div>
+                        </label>
 
-                    <!-- オプション5: 法線 -->
-                    <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
-                        <input type="checkbox" id="chk-normal" checked
-                            class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
-                        <span class="text-gray-700 font-medium">反射点に法線と角度（入射角・反射角）を表示</span>
-                    </label>
+                        <!-- オプション5: 法線 -->
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                            <input type="checkbox" id="chk-normal"
+                                class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                            <span class="text-gray-700 font-medium text-sm md:text-base">反射点に法線と角度を表示</span>
+                        </label>
 
-                    <!-- オプション6: 直接光 -->
-                    <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition mt-2 border-t pt-4">
-                        <input type="checkbox" id="chk-direct" checked
-                            class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
-                        <div>
-                            <span class="block text-gray-800 font-medium">物体から直接目に届く光</span>
-                            <span class="block text-xs text-gray-500">実像を見るための光です（薄い線で描画）。</span>
-                        </div>
-                    </label>
+                        <!-- オプション6: 直接光 -->
+                        <label class="flex items-center space-x-3 cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition">
+                            <input type="checkbox" id="chk-direct"
+                                class="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500 border-gray-300">
+                            <div>
+                                <span class="block text-gray-800 font-medium text-sm md:text-base">物体から直接目に届く光</span>
+                                <span class="block text-[10px] md:text-xs text-gray-500">実像を見るための光です（薄い線で描画）。</span>
+                            </div>
+                        </label>
+                    </div>
                 </div>
             </div>
 
             <!-- 解説セクション -->
-            <div class="mt-8 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-                <h3 class="font-bold text-emerald-800 mb-2">💡 なぜ上下逆さまになるの？</h3>
-                <p class="text-sm text-gray-700 leading-relaxed">
-                    物体の<strong>上端（赤色）</strong>から出た光は、手前の水面で反射して目に入ります。そのため、延長線上では<strong>深い位置</strong>にあるように見えます。<br>
-                    逆に<strong>下端（青色）</strong>から出た光は、奥の水面で反射するため、<strong>浅い位置</strong>にあるように見えます。この位置関係の逆転が、像を逆さまに見せています。
-                </p>
+            <div class="mt-6 md:mt-8 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
             </div>
         </div>
     </div>
