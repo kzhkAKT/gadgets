@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>光の屈折シミュレータ (Light Refraction Simulator)</title>
+  <!-- p5.jsライブラリの読み込み -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    /* ==========================================
+       CSS スタイル定義
+       ========================================== */
+    body {
+      font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+      background-color: #f9fafb;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #333;
+    }
+    .container {
+      display: flex;
+      flex-direction: row;
+      gap: 20px;
+      max-width: 1000px;
+      width: 100%;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 340px;
+    }
+    .panel {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    h1 {
+      font-size: 1.2rem;
+      margin-top: 0;
+      margin-bottom: 15px;
+      color: #111;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 10px;
+    }
+    .slider-row {
+      margin-bottom: 15px;
+    }
+    .slider-row label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+      font-size: 0.9rem;
+    }
+    .slider-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .slider-control input[type="range"] {
+      flex: 1;
+      cursor: pointer;
+    }
+    .slider-control span {
+      width: 45px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-weight: bold;
+    }
+    .instruction {
+      font-size: 0.85rem;
+      color: #555;
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 6px;
+      margin-top: 15px;
+      line-height: 1.5;
+    }
+    .formula-box ul {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .formula-box li {
+      margin-bottom: 6px;
+    }
+    #canvas-container {
+      background: white;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- 左側パネル: パラメータ設定 -->
+  <div class="left-panel">
+    <div class="panel">
+      <h1>パラメータ設定</h1>
+      
+      <div class="slider-row">
+        <label>入射角 i<sub>1</sub></label>
+        <div class="slider-control">
+          <input type="range" id="angleSlider" min="-80" max="80" value="45">
+          <span><span id="angleVal">45</span>&deg;</span>
+        </div>
+      </div>
+      
+      <div class="slider-row">
+        <label>光源の位置 X</label>
+        <div class="slider-control">
+          <input type="range" id="lightXSlider" min="0" max="550" value="110">
+          <span><span id="lightXVal">110</span></span>
+        </div>
+      </div>
+
+      <div class="slider-row">
+        <label>光源の位置 Y</label>
+        <div class="slider-control">
+          <input type="range" id="lightYSlider" min="0" max="650" value="60">
+          <span><span id="lightYVal">60</span></span>
+        </div>
+      </div>
+
+      <div class="slider-row">
+        <label>物質1の屈折率 n<sub>1</sub></label>
+        <div class="slider-control">
+          <input type="range" id="n1Slider" min="1.0" max="3.0" step="0.1" value="1.5">
+          <span><span id="n1Val">1.5</span></span>
+        </div>
+      </div>
+      
+      <div class="slider-row">
+        <label>物質2の屈折率 n<sub>2</sub></label>
+        <div class="slider-control">
+          <input type="range" id="n2Slider" min="1.0" max="3.0" step="0.1" value="2.0">
+          <span><span id="n2Val">2.0</span></span>
+        </div>
+      </div>
+
+      <div class="instruction">
+        <strong>💡 操作方法</strong><br>
+        ・「物質1」「物質2」の領域を上下にドラッグして動かせます。<br>
+        ・光源の<strong>本体</strong>をドラッグして射出位置を変更できます。<br>
+        ・光源の<strong>お尻の丸い部分</strong>をドラッグすると、光の向き（入射角）を回転できます。
+      </div>
+    </div>
+
+    <!-- 左側パネル: 計算式表示 -->
+    <div class="panel formula-box">
+      <h1>各境界における関係式</h1>
+      <ul id="formula-list">
+        <!-- JSにより動的生成 -->
+      </ul>
+      <p style="font-size:0.8rem; color:#666; margin-top:10px; margin-bottom:0;">※真空の屈折率 n<sub>0</sub> = 1.0 として計算しています。</p>
+      <p style="font-size:0.8rem; color:#666; margin-top:5px; margin-bottom:0;">※物質をドラッグして密着させると、境界が変わり式も変化します。</p>
+    </div>
+  </div>
+
+  <!-- 右側パネル: キャンバス -->
+  <div id="canvas-container"></div>
+</div>
+
+<script>
+  /* ==========================================
+     UI イベントリスナーの設定
+     ========================================== */
+  const angleSlider = document.getElementById('angleSlider');
+  const n1Slider = document.getElementById('n1Slider');
+  const n2Slider = document.getElementById('n2Slider');
+  const lightXSlider = document.getElementById('lightXSlider');
+  const lightYSlider = document.getElementById('lightYSlider');
+
+  angleSlider.addEventListener('input', () => { document.getElementById('angleVal').innerText = angleSlider.value; });
+  n1Slider.addEventListener('input', () => { document.getElementById('n1Val').innerText = parseFloat(n1Slider.value).toFixed(1); });
+  n2Slider.addEventListener('input', () => { document.getElementById('n2Val').innerText = parseFloat(n2Slider.value).toFixed(1); });
+  lightXSlider.addEventListener('input', () => { 
+    document.getElementById('lightXVal').innerText = lightXSlider.value; 
+    lightSource.x = parseFloat(lightXSlider.value);
+  });
+  lightYSlider.addEventListener('input', () => { 
+    document.getElementById('lightYVal').innerText = lightYSlider.value; 
+    lightSource.y = parseFloat(lightYSlider.value);
+  });
+
+  /* ==========================================
+     シミュレーション状態の管理変数
+     ========================================== */
+  let rect1, rect2;        // 物質の領域情報
+  let lightSource;         // 光源の位置情報
+  let dragging = null;     // 現在ドラッグ中の対象 ('light_move', 'light_rotate', 'rect1', 'rect2', null)
+  let dragOffsetY = 0;     // ドラッグ開始時のY座標オフセット
+  let lastBoundariesStr = ""; // 数式UI更新用のキャッシュ文字
+  const n0 = 1.0;          // 真空の屈折率
+
+  /* ==========================================
+     p5.js メイン関数
+     ========================================== */
+  function setup() {
+    let canvas = createCanvas(550, 650);
+    canvas.parent('canvas-container');
+    
+    // 初期設定 (ポインターが上にはみ出さないよう全体を下にシフト)
+    rect1 = { y: 180, h: 100 };
+    rect2 = { y: 410, h: 100 };
+    lightSource = { x: 110, y: 60 };
+  }
+
+  function draw() {
+    background(252, 252, 250); 
+    
+    // 現在のパラメータを取得
+    const n1 = parseFloat(n1Slider.value);
+    const n2 = parseFloat(n2Slider.value);
+    const angle_i1 = parseFloat(angleSlider.value);
+    
+    // 1. カーソルの更新
+    updateCursor(angle_i1);
+    
+    // 2. 背景・物質の描画
+    drawSubstances(n1, n2);
+    
+    // 3. 光源の描画
+    drawLightPointer(angle_i1);
+    
+    // 4. 光線の経路計算
+    const rayData = calculateRayPath(n1, n2, angle_i1);
+    
+    // 5. 光線の描画
+    drawRayPath(rayData);
+    
+    // 6. パネルの数式更新
+    updateFormulaPanel(rayData.boundaries, n1, n2, rayData.currentN);
+  }
+
+  /* ==========================================
+     描画系ヘルパー関数
+     ========================================== */
+
+  /**
+   * マウス位置に応じてカーソル形状を変更する
+   */
+  function updateCursor(angle_i1) {
+    if (dragging) {
+      cursor('grabbing');
+      return;
+    }
+    
+    if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+      const angleRad = radians(angle_i1);
+      const tailX = lightSource.x - 45 * Math.sin(angleRad);
+      const tailY = lightSource.y - 45 * Math.cos(angleRad);
+      const bodyX = lightSource.x - 22.5 * Math.sin(angleRad);
+      const bodyY = lightSource.y - 22.5 * Math.cos(angleRad);
+      
+      if (dist(mouseX, mouseY, tailX, tailY) < 20) {
+        cursor('pointer'); // 回転ハンドル
+      } else if (dist(mouseX, mouseY, bodyX, bodyY) < 30 || dist(mouseX, mouseY, lightSource.x, lightSource.y) < 20) {
+        cursor('move'); // 光源移動
+      } else if ((mouseY >= rect1.y && mouseY <= rect1.y + rect1.h) || 
+                 (mouseY >= rect2.y && mouseY <= rect2.y + rect2.h)) {
+        cursor('ns-resize'); // 物質の上下移動
+      } else {
+        cursor(ARROW);
+      }
+    } else {
+      cursor(ARROW);
+    }
+  }
+
+  /**
+   * 物質(四角形)とラベルテキストを描画する
+   */
+  function drawSubstances(n1, n2) {
+    // 物質1
+    fill(225, 245, 250);
+    stroke(0);
+    strokeWeight(1.5);
+    rect(0, rect1.y, width, rect1.h);
+    
+    // 物質2
+    fill(205, 225, 240);
+    stroke(0);
+    strokeWeight(1.5);
+    rect(0, rect2.y, width, rect2.h);
+    
+    // --- ラベルの描画 ---
+    // 左端に寄りすぎないようX座標を50に設定
+    const labelX = 50; 
+    
+    fill(50);
+    noStroke();
+    textSize(18);
+    textAlign(LEFT, CENTER);
+    text("物質1", labelX, rect1.y + rect1.h / 2);
+    text("物質2", labelX, rect2.y + rect2.h / 2);
+    
+    textAlign(RIGHT, CENTER);
+    textSize(16);
+    text("屈折率 n1", width - 30, rect1.y + rect1.h / 2);
+    text("屈折率 n2", width - 30, rect2.y + rect2.h / 2);
+
+    // 真空テキストの動的配置
+    let full_y_points = [0, rect1.y, rect1.y + rect1.h, rect2.y, rect2.y + rect2.h, height];
+    full_y_points = [...new Set(full_y_points)].filter(y => y >= 0 && y <= height).sort((a, b) => a - b);
+    
+    textAlign(LEFT, CENTER);
+    textSize(18);
+    for (let i = 0; i < full_y_points.length - 1; i++) {
+      let midY = (full_y_points[i] + full_y_points[i+1]) / 2;
+      let h = full_y_points[i+1] - full_y_points[i];
+      if (getRefractiveIndexAt(midY, n1, n2) === n0 && h > 20) { 
+        // 画面の上下端でテキストが切れないように制限
+        let drawY = constrain(midY, 25, height - 25);
+        text("真空", labelX, drawY);
+      }
+    }
+  }
+
+  /**
+   * 光源（レーザーポインター）を描画する
+   */
+  function drawLightPointer(angle_i1) {
+    push();
+    translate(lightSource.x, lightSource.y);
+    rotate(-radians(angle_i1)); // 光の射出方向にポインターを向ける
+    
+    // ポインター本体
+    fill(70);
+    stroke(40);
+    strokeWeight(1.5);
+    rect(-12, -45, 24, 45, 4); 
+    
+    // 発射口（先端付近）
+    fill(255, 60, 60);
+    noStroke();
+    rect(-8, -10, 16, 10, 2, 2, 2, 2);
+    
+    // 発射口のハイライト
+    fill(255, 200, 200);
+    ellipse(0, -2, 8, 4);
+    
+    // 回転用ハンドル（お尻の部分）
+    fill(100);
+    stroke(40);
+    strokeWeight(1.5);
+    circle(0, -45, 16);
+    fill(200);
+    noStroke();
+    circle(0, -45, 6);
+    pop();
+  }
+
+  /**
+   * スネルの法則を用いて光の経路を計算する
+   */
+  function calculateRayPath(n1, n2, angle_i1) {
+    let full_y_points = [0, rect1.y, rect1.y + rect1.h, rect2.y, rect2.y + rect2.h, height];
+    full_y_points = [...new Set(full_y_points)].filter(y => y >= 0 && y <= height).sort((a, b) => a - b);
+    let y_points = full_y_points.filter(y => y > lightSource.y && y < height);
+    
+    let boundaries = [];
+    let currentN = getRefractiveIndexAt(lightSource.y, n1, n2);
+    let n_prev = currentN;
+    const labelLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    // 屈折率が変化するy座標を境界として登録
+    for (let i = 0; i < y_points.length; i++) {
+      let b_y = y_points[i];
+      let n_next = getRefractiveIndexAt(b_y + 0.1, n1, n2);
+      
+      if (n_next !== n_prev) {
+        let idx = boundaries.length;
+        boundaries.push({ 
+          y: b_y, 
+          n_next: n_next,
+          label: labelLetters[idx],
+          inLabel: 'i',
+          inSub: (idx + 1).toString(),
+          outLabel: 'r',
+          outSub: (idx + 1).toString()
+        });
+        n_prev = n_next;
+      }
+    }
+
+    let currentAngle = radians(angle_i1);
+    let x = lightSource.x;
+    let y = lightSource.y;
+    
+    let points = [];
+    points.push({ x: x, y: y });
+    
+    let isTotalInternalReflection = false;
+    let traceN = currentN;
+    
+    for (let i = 0; i < boundaries.length; i++) {
+      let b = boundaries[i];
+      let dy = b.y - y;
+      let dx = dy * Math.tan(currentAngle);
+      let nextX = x + dx;
+      
+      // スネルの法則: n1 * sin(θ1) = n2 * sin(θ2)
+      let sinNext = (traceN * Math.sin(currentAngle)) / b.n_next;
+      let nextAngle = 0;
+      let reflect = false;
+      
+      // 全反射の判定
+      if (Math.abs(sinNext) > 1.0) {
+        reflect = true;
+        isTotalInternalReflection = true;
+      } else {
+        nextAngle = Math.asin(sinNext);
+      }
+      
+      points.push({
+        x: nextX, 
+        y: b.y, 
+        label: b.label, 
+        angleIn: currentAngle, 
+        angleOut: nextAngle,
+        n_in: traceN, 
+        n_out: b.n_next,
+        inLabel: b.inLabel,
+        inSub: b.inSub,
+        outLabel: b.outLabel,
+        outSub: b.outSub,
+        reflect: reflect
+      });
+      
+      if (reflect) break; // 全反射以降は計算しない
+      
+      currentAngle = nextAngle;
+      traceN = b.n_next;
+      x = nextX;
+      y = b.y;
+    }
+    
+    // 画面下端までの線
+    if (!isTotalInternalReflection) {
+      let dy = height - y;
+      let dx = dy * Math.tan(currentAngle);
+      points.push({ x: x + dx, y: height });
+    }
+
+    return {
+      points: points,
+      boundaries: boundaries,
+      currentN: currentN,
+      isTotalInternalReflection: isTotalInternalReflection
+    };
+  }
+
+  /**
+   * 計算された光線の情報をもとに画面に描画する
+   */
+  function drawRayPath(rayData) {
+    const { points, isTotalInternalReflection } = rayData;
+    
+    textAlign(LEFT, BASELINE);
+    
+    // 境界の法線と角度・ラベルの描画
+    for (let i = 1; i < points.length - (isTotalInternalReflection ? 0 : 1); i++) {
+      let p = points[i];
+      
+      // 法線（破線）
+      stroke(100);
+      strokeWeight(1.5);
+      drawingContext.setLineDash([6, 6]);
+      line(p.x, p.y - 45, p.x, p.y + 45);
+      drawingContext.setLineDash([]);
+      
+      // 点のラベル (A, B, C...)
+      fill(0);
+      noStroke();
+      textSize(18);
+      // ラベルが重ならないように配置
+      let isRightDir = p.angleIn >= 0;
+      if (isRightDir) { 
+        text(p.label, p.x - 24, p.y - 12);
+      } else { 
+        text(p.label, p.x + 12, p.y - 12);
+      }
+      
+      // 角度の弧
+      stroke(50);
+      noFill();
+      strokeWeight(1);
+      drawAngleArc(p.x, p.y, p.angleIn, true);
+      if (!p.reflect) {
+        drawAngleArc(p.x, p.y, p.angleOut, false);
+      }
+      
+      // 角度テキスト (i1, r1 など)
+      fill(50);
+      noStroke();
+      drawAngleText(p.inLabel, p.inSub, p.x, p.y, true, p.angleIn);
+      if (!p.reflect) {
+        drawAngleText(p.outLabel, p.outSub, p.x, p.y, false, p.angleOut);
+      }
+    }
+    
+    // 光線のパスを描画
+    stroke(220, 20, 20);
+    strokeWeight(2.5);
+    noFill();
+    beginShape();
+    for (let p of points) {
+      vertex(p.x, p.y);
+    }
+    endShape();
+    
+    // 光線の矢印を描画
+    for (let i = 0; i < points.length - 1; i++) {
+      drawArrow(points[i].x, points[i].y, points[i+1].x, points[i+1].y);
+    }
+    
+    // 全反射時の警告メッセージ
+    if (isTotalInternalReflection) {
+      fill(220, 20, 20);
+      noStroke();
+      textSize(20);
+      textAlign(CENTER, CENTER);
+      text("全反射が発生しました", width / 2, 30);
+    }
+  }
+
+  /* ==========================================
+     UI更新・ユーティリティ関数
+     ========================================== */
+
+  /**
+   * 指定したY座標における屈折率を返す
+   */
+  function getRefractiveIndexAt(y_val, n1, n2) {
+    if (y_val >= rect2.y && y_val < rect2.y + rect2.h) return n2;
+    if (y_val >= rect1.y && y_val < rect1.y + rect1.h) return n1;
+    return n0;
+  }
+
+  /**
+   * 左パネルの式を動的更新する
+   */
+  function updateFormulaPanel(boundaries, n1, n2, currentN) {
+    let currentBoundariesStr = JSON.stringify(boundaries.map(b => ({n: b.n_next}))) + "_" + currentN + "_" + n1 + "_" + n2;
+    if (currentBoundariesStr !== lastBoundariesStr) {
+      let ul = document.getElementById('formula-list');
+      if (ul) {
+        if (boundaries.length === 0) {
+          ul.innerHTML = '<li>屈折する境界がありません</li>';
+        } else {
+          let html = '';
+          let tempN = currentN;
+          for (let i = 0; i < boundaries.length; i++) {
+             let b = boundaries[i];
+             let n_in_str = (tempN === n0) ? 'n<sub>0</sub>' : (tempN === n1) ? 'n<sub>1</sub>' : 'n<sub>2</sub>';
+             let n_out_str = (b.n_next === n0) ? 'n<sub>0</sub>' : (b.n_next === n1) ? 'n<sub>1</sub>' : 'n<sub>2</sub>';
+             html += `<li>点${b.label}: ${n_in_str} &middot; sin(i<sub>${i+1}</sub>) = ${n_out_str} &middot; sin(r<sub>${i+1}</sub>)</li>`;
+             tempN = b.n_next;
+          }
+          ul.innerHTML = html;
+        }
+      }
+      lastBoundariesStr = currentBoundariesStr;
+    }
+  }
+
+  function drawAngleArc(x, y, angle, isIncident) {
+    let r = 40;
+    if (Math.abs(angle) > 0.01) {
+      if (isIncident) {
+        if (angle > 0) arc(x, y, r, r, -HALF_PI - angle, -HALF_PI);
+        else arc(x, y, r, r, -HALF_PI, -HALF_PI - angle);
+      } else {
+        if (angle > 0) arc(x, y, r, r, HALF_PI - angle, HALF_PI);
+        else arc(x, y, r, r, HALF_PI, HALF_PI - angle);
+      }
+    }
+  }
+
+  function drawAngleText(label, sub, x, y, isIncident, angle) {
+    textSize(16);
+    textStyle(ITALIC);
+    
+    let isRight = angle < 0; 
+    let offsetX = isRight ? 10 : -28;
+    
+    if (isIncident) {
+      let px = x + offsetX;
+      let py = y - 25;
+      text(label, px, py);
+      textStyle(NORMAL);
+      let tw = textWidth(label);
+      textSize(12);
+      text(sub, px + tw + 1, py + 4);
+    } else {
+      offsetX = isRight ? 15 : -25;
+      let px = x + offsetX;
+      let py = y + 40;
+      text(label, px, py);
+      textStyle(NORMAL);
+      let tw = textWidth(label);
+      textSize(12);
+      text(sub, px + tw + 1, py + 4);
+    }
+    textStyle(NORMAL);
+  }
+
+  function drawArrow(x1, y1, x2, y2) {
+    let angle = atan2(y2 - y1, x2 - x1);
+    let dist = Math.hypot(x2 - x1, y2 - y1);
+    if (dist < 20) return;
+    
+    let midX = (x1 + x2) / 2;
+    let midY = (y1 + y2) / 2;
+    
+    push();
+    translate(midX, midY);
+    rotate(angle);
+    let arrowSize = 10;
+    fill(220, 20, 20);
+    noStroke();
+    triangle(0, arrowSize / 1.5, 0, -arrowSize / 1.5, arrowSize, 0);
+    pop();
+  }
+
+  /* ==========================================
+     マウスイベント処理
+     ========================================== */
+  function mousePressed() {
+    if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+      let angleRad = radians(parseFloat(angleSlider.value));
+      let tailX = lightSource.x - 45 * Math.sin(angleRad);
+      let tailY = lightSource.y - 45 * Math.cos(angleRad);
+      
+      // 回転ハンドル（お尻）を優先して掴む
+      if (dist(mouseX, mouseY, tailX, tailY) < 20) {
+        dragging = 'light_rotate';
+        return;
+      }
+      
+      // 光源本体を掴む（移動）
+      let bodyX = lightSource.x - 22.5 * Math.sin(angleRad);
+      let bodyY = lightSource.y - 22.5 * Math.cos(angleRad);
+      if (dist(mouseX, mouseY, bodyX, bodyY) < 30 || dist(mouseX, mouseY, lightSource.x, lightSource.y) < 20) {
+        dragging = 'light_move';
+        return;
+      }
+
+      // 描画順(上になる方)を優先して掴む
+      if (mouseY >= rect2.y && mouseY <= rect2.y + rect2.h) {
+        dragging = 'rect2';
+        dragOffsetY = mouseY - rect2.y;
+      } else if (mouseY >= rect1.y && mouseY <= rect1.y + rect1.h) {
+        dragging = 'rect1';
+        dragOffsetY = mouseY - rect1.y;
+      }
+    }
+  }
+
+  function mouseDragged() {
+    if (dragging === 'light_move') {
+      lightSource.x = constrain(mouseX, 0, width);
+      lightSource.y = constrain(mouseY, 0, height);
+      
+      // スライダーの表示同期
+      if (lightXSlider) {
+        lightXSlider.value = lightSource.x;
+        document.getElementById('lightXVal').innerText = Math.round(lightSource.x);
+      }
+      if (lightYSlider) {
+        lightYSlider.value = lightSource.y;
+        document.getElementById('lightYVal').innerText = Math.round(lightSource.y);
+      }
+    } else if (dragging === 'light_rotate') {
+      let dx = lightSource.x - mouseX;
+      let dy = lightSource.y - mouseY;
+      
+      if (dy < 5) dy = 5; // 上を向きすぎるのを防止
+      
+      let angle = Math.atan2(dx, dy); 
+      let deg = constrain(degrees(angle), -80, 80);
+      
+      if (angleSlider) {
+        angleSlider.value = deg;
+        document.getElementById('angleVal').innerText = Math.round(deg);
+      }
+    } else if (dragging === 'rect1') {
+      rect1.y = constrain(mouseY - dragOffsetY, 0, rect2.y - rect1.h);
+    } else if (dragging === 'rect2') {
+      rect2.y = constrain(mouseY - dragOffsetY, rect1.y + rect1.h, height - rect2.h);
+    }
+  }
+
+  function mouseReleased() {
+    dragging = null;
+  }
+</script>
+</body>
+</html>
