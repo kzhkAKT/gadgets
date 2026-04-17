@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="等加速度運動のv-tグラフを短冊に分割して面積を計算する様子を視覚的に学べるインタラクティブな教材です。">
+  <meta property="og:title" content="v-t グラフの分割による考察">
+  <meta property="og:description" content="等加速度運動のv-tグラフを短冊に分割して面積を計算する様子を視覚的に学べるインタラクティブな教材です。">
+  <meta property="og:type" content="website">
+  <title>v-t グラフの分割による考察</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background-color: #f8fafc;
+      color: #334155;
+    }
+    .math {
+      font-family: 'Times New Roman', Times, serif;
+      font-style: italic;
+    }
+    .fraction {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      vertical-align: middle;
+      margin: 0 0.2em;
+    }
+    .fraction > span:first-child {
+      border-bottom: 1px solid currentColor;
+      padding: 0 0.2em;
+      font-size: 0.85em;
+      line-height: 1.1;
+    }
+    .fraction > span:last-child {
+      padding: 0 0.2em;
+      font-size: 0.85em;
+      line-height: 1.1;
+    }
+    /* キャンバスのレスポンシブ対応 */
+    #canvas-container canvas {
+      max-width: 100%;
+      height: auto;
+      display: block;
+    }
+    /* スライダーのカスタマイズ */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      margin-top: -8px;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      cursor: pointer;
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8">
+
+  <div class="max-w-5xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6 text-slate-800 border-b pb-2 border-slate-300">
+      v-t グラフの分割による考察
+    </h1>
+
+    <!-- コントロールパネル -->
+    <div class="flex justify-center mb-6">
+      <div class="flex items-center space-x-4 bg-white px-6 py-4 rounded-full shadow-sm border border-slate-200">
+        <label for="splitSlider" class="font-bold text-slate-700">分割数を調整 :</label>
+        <input type="range" id="splitSlider" min="1" max="50" value="1" class="w-48 md:w-64">
+        <span class="font-bold text-blue-600 w-16 text-right"><span id="splitValue" class="text-xl">1</span> 分割</span>
+      </div>
+    </div>
+
+    <!-- キャンバスコンテナ -->
+    <div class="flex justify-center mb-8">
+      <div id="canvas-container" class="bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden"></div>
+    </div>
+
+    <!-- 説明テキスト -->
+    <div class="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 text-lg leading-relaxed">
+      <p class="mb-4">上の図の左側をみながら次のように考えて下さい。</p>
+      
+      <ol class="list-decimal list-outside ml-8 space-y-2 mb-4">
+        <li>時間を等間隔で分割する</li>
+        <li>時間分割の両端の平均速度 <span class="math">v&#772;</span> を使って<br>
+            変位 <span class="math">&Delta;x = v&#772;&Delta;t</span> を求める。</li>
+        <li>求めた <span class="math">&Delta;x</span> を全て加える。</li>
+      </ol>
+      
+      <p class="mb-2">この考え方で分割を増やし <span class="math">&Delta;t</span> を小さくすれば 右の図のようになります。</p>
+      <p>つまり「時間軸と <span class="math">v-t</span> グラフで囲まれた(三角形の)面積が 変位 <span class="math">s</span>」ということができます。</p>
+      
+      <hr class="my-8 border-slate-200">
+      
+      <p class="mb-6">初速度 <span class="math">v<sub>0</sub></span> がゼロ(初め静止していた)の物体の等加速度直線運動は</p>
+      
+      <div class="flex justify-center">
+        <div class="text-xl space-y-3 font-medium">
+          <div class="flex items-center"><span class="w-8 math">a</span> : 一定</div>
+          <div class="flex items-center"><span class="w-8 math">v</span> = <span class="math ml-2">at</span></div>
+          <div class="flex items-center">
+            <span class="w-8 math">s</span> = 
+            <span class="fraction ml-2"><span>1</span><span>2</span></span> <span class="math">v &middot; t</span>
+            <span class="mx-3">=</span>
+            <span class="fraction"><span>1</span><span>2</span></span> <span class="math">at<sup>2</sup></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let slider;
+    let valSpan;
+
+    function setup() {
+      let canvas = createCanvas(900, 480);
+      canvas.parent('canvas-container');
+      
+      slider = document.getElementById('splitSlider');
+      valSpan = document.getElementById('splitValue');
+      
+      slider.addEventListener('input', () => {
+        valSpan.innerText = slider.value;
+        redraw();
+      });
+      
+      noLoop(); // スライダー操作時のみ再描画する
+    }
+
+    // 矢印付きの線を描画するヘルパー関数
+    function drawArrow(x1, y1, x2, y2, arrowSize = 6) {
+      line(x1, y1, x2, y2);
+      let angle = atan2(y2 - y1, x2 - x1);
+      push();
+      translate(x2, y2);
+      rotate(angle);
+      fill(0);
+      noStroke();
+      triangle(0, 0, -arrowSize, arrowSize*0.4, -arrowSize, -arrowSize*0.4);
+      pop();
+    }
+
+    // 両端に矢印が付いた線を描画するヘルパー関数
+    function drawBothArrow(x1, y1, x2, y2, arrowSize = 6) {
+      line(x1, y1, x2, y2);
+      let angle = atan2(y2 - y1, x2 - x1);
+      push();
+      translate(x2, y2);
+      rotate(angle);
+      fill(0);
+      noStroke();
+      triangle(0, 0, -arrowSize, arrowSize*0.4, -arrowSize, -arrowSize*0.4);
+      pop();
+      push();
+      translate(x1, y1);
+      rotate(angle + Math.PI);
+      fill(0);
+      noStroke();
+      triangle(0, 0, -arrowSize, arrowSize*0.4, -arrowSize, -arrowSize*0.4);
+      pop();
+    }
+
+    // 数式用テキスト描画のヘルパー
+    function drawText(txt, x, y, alignX, alignY, size = 20) {
+      push();
+      textFont('Times New Roman');
+      textStyle(ITALIC);
+      textSize(size);
+      textAlign(alignX, alignY);
+      noStroke();
+      fill(0);
+      text(txt, x, y);
+      pop();
+    }
+
+    // 下付き文字の取得
+    function getSubscript(num) {
+      const subs = ['\u2080', '\u2081', '\u2082', '\u2083', '\u2084', '\u2085', '\u2086', '\u2087', '\u2088', '\u2089'];
+      return num.toString().split('').map(d => subs[d]).join('');
+    }
+
+    function draw() {
+      background(255);
+      let n = parseInt(slider.value, 10);
+
+      // グラフのサイズと配置
+      let w = 320;
+      let h = 280;
+      let o1x = 80;
+      let o1y = 350;
+      let o2x = 510;
+      let o2y = 350;
+      
+      let scaleX = w / 10;
+      let scaleY = h / 10;
+
+      // 短冊の色
+      let rectColor = color(235, 195, 195);
+
+
+      // ==========================================
+      // 右グラフ（極限：三角形）
+      // ==========================================
+      
+      // 三角形の塗りつぶし
+      fill(rectColor);
+      stroke(0);
+      strokeWeight(1);
+      triangle(o2x, o2y, o2x + w, o2y, o2x + w, o2y - h);
+      
+      // 軸
+      stroke(0);
+      strokeWeight(1.5);
+      drawArrow(o2x - 30, o2y, o2x + w + 40, o2y); // t軸
+      drawArrow(o2x, o2y + 30, o2x, o2y - h - 40); // v軸
+      
+      // 直線 (v=at)
+      strokeWeight(2);
+      line(o2x, o2y, o2x + w, o2y - h);
+      
+      // 補助線（縦の破線）
+      strokeWeight(1);
+      drawingContext.setLineDash([4, 4]);
+      line(o2x + w, o2y, o2x + w, o2y + 40);
+      drawingContext.setLineDash([]);
+      
+      // ラベル
+      drawText("t", o2x + w + 20, o2y + 10, LEFT, TOP, 22);
+      drawText("v", o2x - 10, o2y - h - 20, RIGHT, BOTTOM, 22);
+      drawText("t", o2x + w/2, o2y + 5, CENTER, TOP, 22);
+      drawText("at", o2x + w + 5, o2y - h/2, LEFT, CENTER, 22);
+
+
+      // ==========================================
+      // 左グラフ（短冊分割）
+      // ==========================================
+      
+      // 軸
+      stroke(0);
+      strokeWeight(1.5);
+      drawArrow(o1x - 30, o1y, o1x + w + 40, o1y); // t軸
+      drawArrow(o1x, o1y + 30, o1x, o1y - h - 40); // v軸
+      
+      // 矩形の描画
+      let dt = 10 / n;
+      let sw = dt * scaleX;
+      
+      for (let i = 0; i < n; i++) {
+        let t1 = i * dt;
+        let t2 = (i + 1) * dt;
+        let t_mid = (t1 + t2) / 2;
+        let v_mid = t_mid; // a=1とするため v=t
+        
+        let x = o1x + t1 * scaleX;
+        let y = o1y - v_mid * scaleY;
+        let sh = v_mid * scaleY;
+        
+        // 短冊
+        fill(rectColor);
+        stroke(0);
+        strokeWeight(1);
+        rect(x, y, sw, sh);
+        
+        // 分割数が少ない時は注釈を描画
+        if (n <= 5) {
+          // 丸印
+          fill(255);
+          strokeWeight(1.5);
+          ellipse(o1x + t_mid * scaleX, y, 8, 8);
+          
+          // 面積のテキスト（v̄_i Δt）
+          drawText(`v\u0304${getSubscript(i+1)}Δt`, x + sw/2, y + sh/2, CENTER, CENTER, 18);
+          
+          // 区切りの破線（下へ）
+          strokeWeight(1);
+          drawingContext.setLineDash([4, 4]);
+          line(x + sw, o1y, x + sw, o1y + 30);
+          drawingContext.setLineDash([]);
+          
+          // Δtの矢印
+          let arrowY = o1y + 20;
+          stroke(0);
+          strokeWeight(1);
+          drawBothArrow(x, arrowY, x + sw, arrowY, 4);
+          drawText("Δt", x + sw/2, arrowY + 5, CENTER, TOP, 18);
+        }
+      }
+      
+      // 左端（原点）の破線と全体の t の矢印
+      if (n <= 5) {
+          stroke(0);
+          strokeWeight(1);
+          drawingContext.setLineDash([4, 4]);
+          line(o1x, o1y, o1x, o1y + 60);
+          line(o1x + w, o1y + 30, o1x + w, o1y + 60);
+          drawingContext.setLineDash([]);
+          
+          let ty = o1y + 50;
+          stroke(0);
+          drawBothArrow(o1x, ty, o1x + w, ty, 5);
+          drawText("t", o1x + w/2, ty + 5, CENTER, TOP, 20);
+      }
+
+      // 直線 (v=at) と右辺
+      stroke(0);
+      strokeWeight(2);
+      line(o1x, o1y, o1x + w, o1y - h); // 斜め線
+      strokeWeight(1);
+      line(o1x + w, o1y, o1x + w, o1y - h); // 右辺の縦線
+      
+      // ラベル
+      drawText("t", o1x + w + 20, o1y + 10, LEFT, TOP, 22);
+      drawText("v", o1x - 10, o1y - h - 20, RIGHT, BOTTOM, 22);
+      drawText("at", o1x + w + 5, o1y - h/2, LEFT, CENTER, 22);
+    }
+  </script>
+</body>
+</html>
