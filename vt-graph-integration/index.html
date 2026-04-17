@@ -77,11 +77,20 @@
     </h1>
 
     <!-- コントロールパネル -->
-    <div class="flex justify-center mb-6">
+    <div class="flex flex-wrap justify-center gap-4 mb-6">
       <div class="flex items-center space-x-4 bg-white px-6 py-4 rounded-full shadow-sm border border-slate-200">
         <label for="splitSlider" class="font-bold text-slate-700">分割数を調整 :</label>
         <input type="range" id="splitSlider" min="1" max="50" value="1" class="w-48 md:w-64">
         <span class="font-bold text-blue-600 w-16 text-right"><span id="splitValue" class="text-xl">1</span> 分割</span>
+      </div>
+      
+      <!-- 初速度トグル -->
+      <div class="flex items-center space-x-3 bg-white px-6 py-4 rounded-full shadow-sm border border-slate-200">
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="v0Switch" class="sr-only peer">
+          <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+          <span class="ml-3 font-bold text-slate-700">初速度 <span class="math">v<sub>0</sub></span></span>
+        </label>
       </div>
     </div>
 
@@ -102,23 +111,14 @@
       </ol>
       
       <p class="mb-2">この考え方で分割を増やし <span class="math">&Delta;t</span> を小さくすれば 右の図のようになります。</p>
-      <p>つまり「時間軸と <span class="math">v-t</span> グラフで囲まれた(三角形の)面積が 変位 <span class="math">s</span>」ということができます。</p>
+      <p id="area-desc">つまり「時間軸と <span class="math">v-t</span> グラフで囲まれた(三角形の)面積が 変位 <span class="math">s</span>」ということができます。</p>
       
       <hr class="my-8 border-slate-200">
       
-      <p class="mb-6">初速度 <span class="math">v<sub>0</sub></span> がゼロ(初め静止していた)の物体の等加速度直線運動は</p>
+      <p id="formula-desc" class="mb-6">初速度 <span class="math">v<sub>0</sub></span> がゼロ(初め静止していた)の物体の等加速度直線運動は</p>
       
-      <div class="flex justify-center">
-        <div class="text-xl space-y-3 font-medium">
-          <div class="flex items-center"><span class="w-8 math">a</span> : 一定</div>
-          <div class="flex items-center"><span class="w-8 math">v</span> = <span class="math ml-2">at</span></div>
-          <div class="flex items-center">
-            <span class="w-8 math">s</span> = 
-            <span class="fraction ml-2"><span>1</span><span>2</span></span> <span class="math">v &middot; t</span>
-            <span class="mx-3">=</span>
-            <span class="fraction"><span>1</span><span>2</span></span> <span class="math">at<sup>2</sup></span>
-          </div>
-        </div>
+      <div id="formula-container" class="flex justify-center">
+        <!-- JSで動的に書き換えられます -->
       </div>
     </div>
   </div>
@@ -126,6 +126,7 @@
   <script>
     let slider;
     let valSpan;
+    let v0Switch;
 
     function setup() {
       let canvas = createCanvas(900, 480);
@@ -133,13 +134,58 @@
       
       slider = document.getElementById('splitSlider');
       valSpan = document.getElementById('splitValue');
+      v0Switch = document.getElementById('v0Switch');
       
       slider.addEventListener('input', () => {
         valSpan.innerText = slider.value;
         redraw();
       });
       
+      v0Switch.addEventListener('change', () => {
+        updateFormula();
+        redraw();
+      });
+      
+      updateFormula();
       noLoop(); // スライダー操作時のみ再描画する
+    }
+
+    function updateFormula() {
+      const container = document.getElementById('formula-container');
+      const desc = document.getElementById('formula-desc');
+      const areaDesc = document.getElementById('area-desc');
+      let hasV0 = v0Switch.checked;
+      
+      if (hasV0) {
+        areaDesc.innerHTML = `つまり「時間軸と <span class="math">v-t</span> グラフで囲まれた(台形つまり長方形と三角形)面積が 変位 <span class="math">s</span>」ということができます。`;
+        desc.innerHTML = `初速度 <span class="math">v<sub>0</sub></span> を持つ物体の等加速度直線運動は`;
+        container.innerHTML = `
+          <div class="text-xl space-y-3 font-medium">
+            <div class="flex items-center"><span class="w-8 math">a</span> : 一定</div>
+            <div class="flex items-center"><span class="w-8 math">v</span> = <span class="math ml-2">v<sub>0</sub> + at</span></div>
+            <div class="flex items-center">
+              <span class="w-8 math">s</span> = 
+              <span class="math ml-2">v<sub>0</sub>t + </span>
+              <span class="fraction mx-1"><span>1</span><span>2</span></span> <span class="math">at<sup>2</sup></span>
+            </div>
+          </div>
+        `;
+      } else {
+        areaDesc.innerHTML = `つまり「時間軸と <span class="math">v-t</span> グラフで囲まれた(三角形の)面積が 変位 <span class="math">s</span>」ということができます。`;
+        desc.innerHTML = `初速度 <span class="math">v<sub>0</sub></span> がゼロ(初め静止していた)の物体の等加速度直線運動は`;
+        container.innerHTML = `
+          <div class="text-xl space-y-3 font-medium">
+            <div class="flex items-center"><span class="w-8 math">a</span> : 一定</div>
+            <div class="flex items-center"><span class="w-8 math">v</span> = <span class="math ml-2">at</span></div>
+            <div class="flex items-center">
+              <span class="w-8 math">s</span> = 
+              <span class="fraction ml-2"><span>1</span><span>2</span></span> <span class="math">v &middot; t</span>
+              <span class="mx-3">=</span>
+              <span class="fraction"><span>1</span><span>2</span></span> <span class="math">at<sup>2</sup></span>
+            </div>
+          </div>
+        `;
+      }
     }
 
     // 矢印付きの線を描画するヘルパー関数
@@ -197,6 +243,7 @@
     function draw() {
       background(255);
       let n = parseInt(slider.value, 10);
+      let hasV0 = document.getElementById('v0Switch').checked;
 
       // グラフのサイズと配置
       let w = 320;
@@ -208,20 +255,31 @@
       
       let scaleX = w / 10;
       let scaleY = h / 10;
+      
+      let t_max = 10;
+      let v_max = 10;
+      let v0_val = hasV0 ? 3 : 0;
+      let a_val = (v_max - v0_val) / t_max;
+      let v0_y = v0_val * scaleY;
 
       // 短冊の色
       let rectColor = color(235, 195, 195);
 
 
       // ==========================================
-      // 右グラフ（極限：三角形）
+      // 右グラフ（極限：台形・三角形）
       // ==========================================
       
-      // 三角形の塗りつぶし
+      // 塗りつぶし
       fill(rectColor);
       stroke(0);
       strokeWeight(1);
-      triangle(o2x, o2y, o2x + w, o2y, o2x + w, o2y - h);
+      beginShape();
+      vertex(o2x, o2y);
+      vertex(o2x + w, o2y);
+      vertex(o2x + w, o2y - h);
+      vertex(o2x, o2y - v0_y);
+      endShape(CLOSE);
       
       // 軸
       stroke(0);
@@ -229,21 +287,30 @@
       drawArrow(o2x - 30, o2y, o2x + w + 40, o2y); // t軸
       drawArrow(o2x, o2y + 30, o2x, o2y - h - 40); // v軸
       
-      // 直線 (v=at)
+      // 直線 (v=v0+at)
       strokeWeight(2);
-      line(o2x, o2y, o2x + w, o2y - h);
+      line(o2x, o2y - v0_y, o2x + w, o2y - h);
       
-      // 補助線（縦の破線）
+      // 補助線
       strokeWeight(1);
       drawingContext.setLineDash([4, 4]);
-      line(o2x + w, o2y, o2x + w, o2y + 40);
+      line(o2x + w, o2y, o2x + w, o2y + 40); // 縦の補助線
+      if (hasV0) {
+        line(o2x, o2y - v0_y, o2x + w, o2y - v0_y); // v0の横補助線
+      }
       drawingContext.setLineDash([]);
       
       // ラベル
       drawText("t", o2x + w + 20, o2y + 10, LEFT, TOP, 22);
       drawText("v", o2x - 10, o2y - h - 20, RIGHT, BOTTOM, 22);
       drawText("t", o2x + w/2, o2y + 5, CENTER, TOP, 22);
-      drawText("at", o2x + w + 5, o2y - h/2, LEFT, CENTER, 22);
+      if (hasV0) {
+        drawText("v\u2080", o2x - 10, o2y - v0_y, RIGHT, CENTER, 22);
+        drawText("at", o2x + w + 5, o2y - v0_y - (h - v0_y)/2, LEFT, CENTER, 22);
+        drawText("v\u2080", o2x + w + 5, o2y - v0_y/2, LEFT, CENTER, 22);
+      } else {
+        drawText("at", o2x + w + 5, o2y - h/2, LEFT, CENTER, 22);
+      }
 
 
       // ==========================================
@@ -257,14 +324,14 @@
       drawArrow(o1x, o1y + 30, o1x, o1y - h - 40); // v軸
       
       // 矩形の描画
-      let dt = 10 / n;
+      let dt = t_max / n;
       let sw = dt * scaleX;
       
       for (let i = 0; i < n; i++) {
         let t1 = i * dt;
         let t2 = (i + 1) * dt;
         let t_mid = (t1 + t2) / 2;
-        let v_mid = t_mid; // a=1とするため v=t
+        let v_mid = v0_val + a_val * t_mid;
         
         let x = o1x + t1 * scaleX;
         let y = o1y - v_mid * scaleY;
@@ -316,17 +383,28 @@
           drawText("t", o1x + w/2, ty + 5, CENTER, TOP, 20);
       }
 
-      // 直線 (v=at) と右辺
+      // 直線 (v=v0+at) と右辺
       stroke(0);
       strokeWeight(2);
-      line(o1x, o1y, o1x + w, o1y - h); // 斜め線
+      line(o1x, o1y - v0_y, o1x + w, o1y - h); // 斜め線
+      
+      // 補助線とラベル
       strokeWeight(1);
       line(o1x + w, o1y, o1x + w, o1y - h); // 右辺の縦線
+      if (hasV0) {
+        drawingContext.setLineDash([4, 4]);
+        line(o1x, o1y - v0_y, o1x + w, o1y - v0_y); // 左グラフ補助線
+        drawingContext.setLineDash([]);
+        drawText("v\u2080", o1x - 10, o1y - v0_y, RIGHT, CENTER, 22);
+        drawText("at", o1x + w + 5, o1y - v0_y - (h - v0_y)/2, LEFT, CENTER, 22);
+        drawText("v\u2080", o1x + w + 5, o1y - v0_y/2, LEFT, CENTER, 22);
+      } else {
+        drawText("at", o1x + w + 5, o1y - h/2, LEFT, CENTER, 22);
+      }
       
       // ラベル
       drawText("t", o1x + w + 20, o1y + 10, LEFT, TOP, 22);
       drawText("v", o1x - 10, o1y - h - 20, RIGHT, BOTTOM, 22);
-      drawText("at", o1x + w + 5, o1y - h/2, LEFT, CENTER, 22);
     }
   </script>
 </body>
