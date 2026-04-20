@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="p5.jsを用いた、凸レンズと凹レンズを複数のプリズム（台形）で近似するシミュレーションです。">
+  <meta name="author" content="Your Name">
+  <title>プリズムによるレンズの近似</title>
+  
+  <!-- p5.js と Tailwind CSS の読み込み -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    /* キャンバスのレスポンシブ対応と装飾 */
+    #canvas-container {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+    #canvas-container canvas {
+      /* 画面幅に合わせて自動縮小しつつ、アスペクト比を維持する */
+      width: 100% !important;
+      max-width: 960px;
+      height: auto !important;
+      aspect-ratio: 960 / 560;
+      border-radius: 0.5rem;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+  </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center py-8 min-h-screen text-gray-800 font-sans">
+
+  <div class="max-w-5xl w-full flex flex-col items-center px-4">
+    <h1 class="text-3xl font-bold mb-6 text-gray-900 text-center">プリズムによるレンズの近似</h1>
+    
+    <!-- 操作UIパネル (HTMLで構造化) -->
+    <div class="bg-white p-6 rounded-xl shadow-md w-full max-w-2xl mb-8 flex flex-col items-center gap-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between w-full gap-6">
+        
+        <!-- 分割数スライダー -->
+        <div class="flex items-center space-x-4 w-full justify-center sm:justify-start">
+          <label for="divisions-slider" class="font-bold text-gray-700 text-lg whitespace-nowrap">分割数:</label>
+          <div class="flex items-center w-full max-w-[200px] gap-2">
+            <span class="text-xs text-gray-400">2</span>
+            <input type="range" id="divisions-slider" min="2" max="30" value="5" step="1" class="w-full cursor-pointer accent-blue-600">
+            <span class="text-xs text-gray-400">30</span>
+          </div>
+        </div>
+        
+        <!-- レンズ切り替えラジオボタン -->
+        <div class="flex items-center space-x-4 w-full justify-center sm:justify-end">
+          <span class="font-bold text-gray-700 text-lg whitespace-nowrap">種類:</span>
+          <div class="flex items-center space-x-4">
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="radio" name="lensType" value="convex" checked class="w-5 h-5 text-blue-600 cursor-pointer">
+              <span class="text-gray-800">凸レンズ</span>
+            </label>
+            <label class="flex items-center space-x-2 cursor-pointer">
+              <input type="radio" name="lensType" value="concave" class="w-5 h-5 text-blue-600 cursor-pointer">
+              <span class="text-gray-800">凹レンズ</span>
+            </label>
+          </div>
+        </div>
+
+      </div>
+      <p class="text-sm text-gray-500 mt-2 text-center">
+        スライダーや選択肢を変更することで、各レンズがいくつのプリズム（台形）で近似されるかを確認できます。
+      </p>
+    </div>
+
+    <!-- p5.js キャンバスのコンテナ -->
+    <div id="canvas-container" class="bg-white rounded-xl"></div>
+  </div>
+
+  <script>
+    // --------------------------------------------------
+    // p5.js セットアップと描画ループ
+    // --------------------------------------------------
+    function setup() {
+      // ロジック上のキャンバスサイズは固定（CSSで表示サイズを調整）
+      let canvas = createCanvas(960, 560);
+      canvas.parent('canvas-container');
+      textFont('sans-serif');
+    }
+
+    function draw() {
+      background(255);
+      
+      // HTMLのUIから値を取得
+      let divisions = parseInt(document.getElementById('divisions-slider').value, 10);
+      let lensType = document.querySelector('input[name="lensType"]:checked').value;
+      
+      // 背景の方眼紙（グリッド）を描画
+      drawGrid();
+      
+      // レンズの寸法パラメータ
+      const H = 360;  // レンズの高さ
+      const W = 120;  // レンズの最大幅（厚み）
+      const cy = 280; // 中心Y座標
+      
+      // テキスト描画: タイトルと現在のパラメータ
+      drawLabels(divisions, lensType);
+
+      // 1. 左側: 通常の滑らかなレンズ
+      stroke(0);
+      strokeWeight(2.5);
+      noFill();
+      drawLens(180, cy, W, H, lensType);
+      drawSymbol("〜", 315, cy - 15, 40);
+      
+      // 2. 中央: スライス位置を示したレンズ
+      stroke(0);
+      strokeWeight(2.5);
+      noFill();
+      drawSlicedLens(450, cy, W, H, divisions, lensType);
+      drawSymbol("→", 585, cy - 10, 30);
+      
+      // 3. 右側: 取り出して積み重ねたプリズム（台形の組合せ）
+      stroke(0);
+      strokeWeight(2.5);
+      noFill();
+      drawPrisms(720, cy, W, H, divisions, lensType);
+      
+      // 右下の注釈テキスト
+      fill(0);
+      noStroke();
+      textSize(22);
+      textAlign(LEFT, TOP);
+      text("頂角 θ の異なる", 630, 480);
+      text("プリズムの組合せ", 630, 510);
+    }
+
+    // --------------------------------------------------
+    // 描画補助関数群
+    // --------------------------------------------------
+
+    /**
+     * タイトルとパラメータ状態を描画
+     */
+    function drawLabels(divisions, lensType) {
+      fill(0);
+      noStroke();
+      textSize(28);
+      textAlign(CENTER, TOP);
+      let titlePrefix = lensType === 'convex' ? '凸' : '凹';
+      text(`プリズムによる${titlePrefix}レンズの近似`, width / 2, 20);
+      
+      textSize(16);
+      fill(100);
+      text(`現在の分割数: ${divisions} / 種類: ${titlePrefix}`, width / 2, 60);
+    }
+
+    /**
+     * 指定位置に記号（矢印など）を描画
+     */
+    function drawSymbol(char, x, y, size) {
+      fill(0);
+      noStroke();
+      textSize(size);
+      textAlign(CENTER, CENTER);
+      text(char, x, y);
+    }
+
+    /**
+     * 放物線近似によるレンズ表面のX座標（中心からの距離）を計算
+     */
+    function f(y, H, W, type) {
+      if (Math.abs(y) > H / 2) return 0;
+      
+      if (type === 'convex') {
+        // 凸レンズ: 中央が厚く、上下が薄い
+        return (W / 2) * (1 - Math.pow(2 * y / H, 2));
+      } else {
+        // 凹レンズ: 中央が薄く、上下が厚い
+        let minW = 20; // 中心の最小幅
+        return (minW / 2) + ((W - minW) / 2) * Math.pow(2 * y / H, 2);
+      }
+    }
+
+    /**
+     * 背景の方眼紙風グリッドを描画
+     */
+    function drawGrid() {
+      let gridSize = 30;
+      
+      // 細い線
+      stroke(235);
+      strokeWeight(1);
+      for (let x = 0; x < width; x += gridSize) line(x, 0, x, height);
+      for (let y = 0; y < height; y += gridSize) line(0, y, width, y);
+      
+      // 太い線（5マスごと）
+      stroke(215);
+      strokeWeight(1.5);
+      for (let x = 0; x < width; x += gridSize * 5) line(x, 0, x, height);
+      for (let y = 0; y < height; y += gridSize * 5) line(0, y, width, y);
+    }
+
+    /**
+     * 滑らかな輪郭のレンズを描画
+     */
+    function drawLens(cx, cy, W, H, type) {
+      beginShape();
+      for(let y = -H/2; y <= H/2; y += 2) {
+        vertex(cx + f(y, H, W, type), cy + y);
+      }
+      for(let y = H/2; y >= -H/2; y -= 2) {
+        vertex(cx - f(y, H, W, type), cy + y);
+      }
+      endShape(CLOSE);
+    }
+
+    /**
+     * スライス線（破線）を入れたレンズを描画
+     */
+    function drawSlicedLens(cx, cy, W, H, divisions, type) {
+      drawLens(cx, cy, W, H, type);
+      
+      drawingContext.setLineDash([5, 5]);
+      strokeWeight(1.5);
+      let dy = H / divisions;
+      
+      for(let i = 1; i < divisions; i++) {
+        let y = -H/2 + i * dy;
+        let x = f(y, H, W, type);
+        line(cx - x, cy + y, cx + x, cy + y);
+      }
+      
+      drawingContext.setLineDash([]);
+      strokeWeight(2.5);
+    }
+
+    /**
+     * プリズム（台形）を積み重ねた近似レンズを描画
+     */
+    function drawPrisms(cx, cy, W, H, divisions, type) {
+      let dy = H / divisions;
+      
+      for(let i = 0; i < divisions; i++) {
+        let y1 = -H/2 + i * dy;
+        let y2 = y1 + dy;
+        let x1 = f(y1, H, W, type);
+        let x2 = f(y2, H, W, type);
+        
+        beginShape();
+        vertex(cx + x1, cy + y1); // 右上
+        vertex(cx + x2, cy + y2); // 右下
+        vertex(cx - x2, cy + y2); // 左下
+        vertex(cx - x1, cy + y1); // 左上
+        endShape(CLOSE);
+      }
+    }
+  </script>
+</body>
+</html>
