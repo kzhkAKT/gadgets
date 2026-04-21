@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>磁束密度の合成シミュレータ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+  <style>
+    /* スライダーのカスタムスタイル */
+    input[type=range] {
+      accent-color: #2563eb; /* blue-600 */
+    }
+    /* キャンバスの枠線調整 */
+    #canvas-container canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+      border-radius: 0.5rem;
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      border: 1px solid #e5e7eb;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body class="bg-white text-gray-900 font-sans h-screen flex flex-col lg:flex-row overflow-hidden">
+  
+  <!-- サイドバー（操作パネル）: ライトテーマ化 -->
+  <div class="order-2 lg:order-1 w-full lg:w-80 p-6 border-t lg:border-t-0 lg:border-r border-gray-300 bg-gray-50 shadow-xl overflow-y-auto z-10 flex-shrink-0 flex flex-col gap-4">
+    <div>
+      <h1 class="text-2xl font-bold mb-4 text-blue-800">磁束密度の合成</h1>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">外部磁場 B (右向き正)</label>
+        <input type="range" id="b-ext" min="-100" max="100" value="0" class="w-full" list="zero-tick">
+        <div class="flex justify-between text-xs text-gray-500 font-medium">
+          <span>左向き</span><span class="ml-2">0</span><span>右向き</span>
+        </div>
+      </div>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">直線電流 I (紙面奥向き正)</label>
+        <input type="range" id="current-i" min="-100" max="100" value="0" class="w-full" list="zero-tick">
+        <div class="flex justify-between text-xs text-gray-500 font-medium">
+          <span>手前 (・)</span><span>0</span><span>奥 (×)</span>
+        </div>
+      </div>
+
+      <!-- 0の位置でスナップさせるためのデータリスト -->
+      <datalist id="zero-tick">
+        <option value="0"></option>
+      </datalist>
+
+      <div class="mb-4 space-y-2">
+        <div class="flex items-center">
+          <input type="checkbox" id="show-force" class="mr-2 w-4 h-4 cursor-pointer" checked>
+          <label for="show-force" class="text-sm font-medium cursor-pointer">ローレンツ力ベクトルを表示</label>
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox" id="show-current-b" class="mr-2 w-4 h-4 cursor-pointer" checked>
+          <label for="show-current-b" class="text-sm font-medium cursor-pointer">電流の磁力線 (緑) を表示</label>
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox" id="show-ext-b" class="mr-2 w-4 h-4 cursor-pointer" checked>
+          <label for="show-ext-b" class="text-sm font-medium cursor-pointer">磁石の磁力線 (濃緑) を表示</label>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 現在の状態パネル -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 shadow-inner">
+      <h2 class="text-sm font-bold text-gray-800 mb-1">現在の状態</h2>
+      <div class="text-xs mb-1">導線上部: <span id="status-up" class="font-bold"></span></div>
+      <div class="text-xs mb-1">導線下部: <span id="status-down" class="font-bold"></span></div>
+      <div class="text-xs mt-2 pt-2 border-t border-blue-200">
+        受ける力 (ローレンツ力):
+        <span id="status-force" class="text-lg font-bold block"></span>
+      </div>
+    </div>
+    
+    <div class="text-[10px] text-gray-500 space-y-1 mt-auto leading-relaxed font-medium">
+      <p>※ <strong>フレミングの左手の法則</strong> を用いて、導線が受ける力の向きを確認できます。</p>
+      <p>※ 磁力線はゴムひものように縮もうとし、互いに反発する性質があります。</p>
+    </div>
+  </div>
+  
+  <!-- メインキャンバス領域 -->
+  <div class="order-1 lg:order-2 flex-1 p-4 bg-gray-200 flex flex-col min-h-[40vh] lg:min-h-0">
+    <div id="canvas-container" class="flex-1 w-full h-full relative">
+      <!-- p5.jsによってここにキャンバスが挿入されます -->
+    </div>
+  </div>
+
+  <script>
+    // --- 物理シミュレータロジック ---
+    let container;
+
+    function setup() {
+      container = document.getElementById('canvas-container');
+      
+      let w = Math.max(10, container.clientWidth); 
+      let h = Math.max(10, container.clientHeight);
+      
+      let canvas = createCanvas(w, h);
+      canvas.parent('canvas-container');
+      
+      document.getElementById('b-ext').addEventListener('input', updateStatus);
+      document.getElementById('current-i').addEventListener('input', updateStatus);
+      updateStatus();
+    }
+
+    function windowResized() {
+      if (!container) return;
+      let w = Math.max(10, container.clientWidth);
+      let h = Math.max(10, container.clientHeight);
+      resizeCanvas(w, h);
+    }
+
+    function draw() {
+      if (width <= 10 || height <= 10) return;
+
+      let I = parseFloat(document.getElementById('current-i').value);
+      let B0 = parseFloat(document.getElementById('b-ext').value);
+      let poleWidth = 60; 
+      
+      background(255); 
+
+      push();
+      // N極とS極の内側（磁極の中）には磁場を描画しないようにクリッピング
+      drawingContext.beginPath();
+      drawingContext.rect(poleWidth, 0, width - 2 * poleWidth, height);
+      drawingContext.clip();
+
+      drawVectors(I, B0, poleWidth);
+      drawExternalMagneticField(B0, poleWidth);
+      drawCurrentMagneticField(I);
+
+      pop();
+
+      drawConductorAndPoles(I, B0, poleWidth);
+      drawForceVector(I, B0);
+    }
+
+    function getMagneticField(x, y, I, B0) {
+      let cx = width / 2;
+      let cy = height / 2;
+      let dx = x - cx;
+      let dy = y - cy;
+      let r2 = dx*dx + dy*dy;
+      
+      let Bx = B0;
+      let By = 0;
+      
+      let k = 150; 
+      let R2 = 400; 
+      
+      if (r2 > R2) {
+        let r_term = (k * I) / r2;
+        Bx += r_term * (-dy);
+        By += r_term * dx;
+      } else {
+        Bx = 0; 
+        By = 0;
+      }
+      
+      return createVector(Bx, By);
+    }
+
+    function drawVectors(I, B0, poleWidth) {
+      let step = 40; 
+      for (let y = step/2; y < height; y += step) {
+        for (let x = step/2; x < width; x += step) {
+          if (x <= poleWidth || x >= width - poleWidth) continue;
+
+          let dx = x - width/2;
+          let dy = y - height/2;
+          if (dx*dx + dy*dy < 400) continue; 
+          
+          let B = getMagneticField(x, y, I, B0);
+          let mag = B.mag();
+          if (mag < 2) continue; 
+          
+          let dir = B.heading();
+          let len = map(mag, 0, 150, 8, step * 0.8);
+          len = constrain(len, 8, step * 0.8);
+          
+          push();
+          translate(x, y);
+          rotate(dir);
+          
+          stroke(100, 100, 100, 180); 
+          strokeWeight(2);
+          line(-len/2, 0, len/2, 0);
+          line(len/2, 0, len/2 - 4, -3);
+          line(len/2, 0, len/2 - 4, 3);
+          
+          pop();
+        }
+      }
+    }
+
+    function drawConductorAndPoles(I, B0, poleWidth) {
+      let cx = width / 2;
+      let cy = height / 2;
+
+      noStroke();
+      // B0の絶対値に応じて透明度を計算 (0〜100 を 0〜255 にマッピング)
+      let alpha = map(Math.abs(B0), 0, 100, 0, 255);
+
+      if (B0 > 0) {
+        fill(220, 38, 38, alpha);
+        rect(0, 0, poleWidth, height);
+        fill(37, 99, 235, alpha);
+        rect(width - poleWidth, 0, poleWidth, height);
+
+        fill(0, alpha);
+        textSize(36);
+        textAlign(CENTER, CENTER);
+        textStyle(BOLD);
+        text("N", poleWidth / 2, cy);
+        text("S", width - poleWidth / 2, cy);
+      } else if (B0 < 0) {
+        fill(37, 99, 235, alpha);
+        rect(0, 0, poleWidth, height);
+        fill(220, 38, 38, alpha);
+        rect(width - poleWidth, 0, poleWidth, height);
+
+        fill(0, alpha);
+        textSize(36);
+        textAlign(CENTER, CENTER);
+        textStyle(BOLD);
+        text("S", poleWidth / 2, cy);
+        text("N", width - poleWidth / 2, cy);
+      }
+      
+      fill(255); 
+      stroke(0); 
+      strokeWeight(3);
+      circle(cx, cy, 40);
+      
+      if (I > 0) {
+        stroke(0);
+        strokeWeight(3);
+        line(cx - 12, cy - 12, cx + 12, cy + 12);
+        line(cx - 12, cy + 12, cx + 12, cy - 12);
+      } else if (I < 0) {
+        fill(0);
+        noStroke();
+        circle(cx, cy, 14);
+      }
+    }
+
+    function drawForceVector(I, B0) {
+      let showForce = document.getElementById('show-force').checked;
+      if (!showForce || I === 0 || B0 === 0) return;
+
+      let cx = width / 2;
+      let cy = height / 2;
+
+      let forceDir = (I * B0 > 0) ? 1 : -1;
+      let forceMag = Math.abs(I * B0) / 40;
+      forceMag = constrain(forceMag, 30, 150);
+
+      push();
+      translate(cx, cy);
+
+      stroke(234, 88, 12);
+      fill(234, 88, 12);
+      strokeWeight(6);
+      let startOffset = 25 * forceDir; 
+      let endOffset = (25 + forceMag) * forceDir;
+
+      line(0, startOffset, 0, endOffset);
+
+      translate(0, endOffset);
+      noStroke();
+      let arrowSize = 12;
+      triangle(-arrowSize, -arrowSize * forceDir, arrowSize, -arrowSize * forceDir, 0, 4 * forceDir);
+
+      pop();
+    }
+
+    function drawExternalMagneticField(B0, poleWidth) {
+      let showExtB = document.getElementById('show-ext-b').checked;
+      if (!showExtB || B0 === 0) return;
+
+      push();
+      stroke(34, 139, 34, 200); 
+      strokeWeight(2);
+      
+      let step = 40;
+      let dir = (B0 > 0) ? 1 : -1;
+      
+      for (let y = step / 2; y < height; y += step) {
+        line(0, y, width, y);
+        
+        for (let x = step; x < width; x += step * 3) {
+          if (x <= poleWidth || x >= width - poleWidth) continue;
+          push();
+          translate(x, y);
+          if (dir < 0) rotate(PI); 
+          fill(34, 139, 34, 240);
+          noStroke();
+          triangle(-8, -5, 8, 0, -8, 5);
+          pop();
+        }
+      }
+      pop();
+    }
+
+    function drawCurrentMagneticField(I) {
+      let showB = document.getElementById('show-current-b').checked;
+      if (!showB || I === 0) return;
+
+      let cx = width / 2;
+      let cy = height / 2;
+      
+      push();
+      stroke(0, 180, 0, 180); 
+      strokeWeight(2);
+      noFill();
+      
+      let radii = [60, 120, 180, 240, 300, 360];
+      for (let r of radii) {
+        if (r > Math.max(width, height)) continue;
+        circle(cx, cy, r * 2);
+        
+        let dir = (I > 0) ? 1 : -1;
+        
+        for (let angle of [0, PI/2, PI, 3*PI/2]) {
+          push();
+          translate(cx + r * cos(angle), cy + r * sin(angle));
+          rotate(angle + dir * PI/2);
+          fill(0, 180, 0, 220);
+          noStroke();
+          triangle(-8, -5, 8, 0, -8, 5);
+          pop();
+        }
+      }
+      pop();
+    }
+
+    function updateStatus() {
+      let I = parseFloat(document.getElementById('current-i').value);
+      let B0 = parseFloat(document.getElementById('b-ext').value);
+      
+      let forceText = "力が働きません";
+      let bUpText = "外部磁場のみ";
+      let bDownText = "外部磁場のみ";
+      let forceColor = "text-gray-500";
+      let bUpColor = "text-gray-600";
+      let bDownColor = "text-gray-600";
+      
+      if (I !== 0 && B0 !== 0) {
+        if ((I > 0 && B0 > 0) || (I < 0 && B0 < 0)) {
+          bUpText = "強め合う (Strong)";
+          bDownText = "弱め合う (Weak)";
+          bUpColor = "text-red-600";
+          bDownColor = "text-blue-600";
+          forceText = "↓ 下向き";
+          forceColor = "text-orange-600"; 
+        } else {
+          bUpText = "弱め合う (Weak)";
+          bDownText = "強め合う (Strong)";
+          bUpColor = "text-blue-600";
+          bDownColor = "text-red-600";
+          forceText = "↑ 上向き";
+          forceColor = "text-orange-600"; 
+        }
+      } else if (I !== 0) {
+        bUpText = "電流による磁場のみ";
+        bDownText = "電流による磁場のみ";
+      } else if (B0 !== 0) {
+        bUpText = "外部磁場のみ";
+        bDownText = "外部磁場のみ";
+      } else {
+        bUpText = "磁場なし";
+        bDownText = "磁場なし";
+      }
+      
+      document.getElementById('status-force').innerText = forceText;
+      document.getElementById('status-force').className = `text-lg font-bold block ${forceColor}`;
+      
+      document.getElementById('status-up').innerText = bUpText;
+      document.getElementById('status-up').className = `font-bold ${bUpColor}`;
+      
+      document.getElementById('status-down').innerText = bDownText;
+      document.getElementById('status-down').className = `font-bold ${bDownColor}`;
+    }
+  </script>
+</body>
+</html>

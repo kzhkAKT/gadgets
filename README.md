@@ -14,3 +14,4 @@ Javascript Gadgets Data Repository
 1. https://kzhkakt.github.io/gadgets/water-reflection-sim/
 1. https://kzhkakt.github.io/gadgets/relative-refraction-sim
 1. https://kzhkakt.github.io/gadgets/prism-lens-sim
+1. https://kzhkakt.github.io/gadgets/lorentz-force-sim
