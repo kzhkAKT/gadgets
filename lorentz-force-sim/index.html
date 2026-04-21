@@ -54,18 +54,22 @@
         <option value="0"></option>
       </datalist>
 
-      <div class="mb-4 space-y-2">
+      <div class="mb-4 grid grid-cols-2 gap-3 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
         <div class="flex items-center">
-          <input type="checkbox" id="show-force" class="mr-2 w-4 h-4 cursor-pointer" checked>
-          <label for="show-force" class="text-sm font-medium cursor-pointer">ローレンツ力ベクトルを表示</label>
+          <input type="checkbox" id="show-vector-field" class="mr-2 w-4 h-4 cursor-pointer" checked>
+          <label for="show-vector-field" class="text-xs font-bold text-gray-700 cursor-pointer">合成磁束密度(矢印)</label>
         </div>
         <div class="flex items-center">
-          <input type="checkbox" id="show-current-b" class="mr-2 w-4 h-4 cursor-pointer" checked>
-          <label for="show-current-b" class="text-sm font-medium cursor-pointer">電流の磁力線 (緑) を表示</label>
+          <input type="checkbox" id="show-force" class="mr-2 w-4 h-4 cursor-pointer" checked>
+          <label for="show-force" class="text-xs font-bold text-orange-600 cursor-pointer">ローレンツ力</label>
         </div>
         <div class="flex items-center">
           <input type="checkbox" id="show-ext-b" class="mr-2 w-4 h-4 cursor-pointer" checked>
-          <label for="show-ext-b" class="text-sm font-medium cursor-pointer">磁石の磁力線 (濃緑) を表示</label>
+          <label for="show-ext-b" class="text-xs font-bold text-green-700 cursor-pointer">磁石の磁力線(濃緑)</label>
+        </div>
+        <div class="flex items-center">
+          <input type="checkbox" id="show-current-b" class="mr-2 w-4 h-4 cursor-pointer" checked>
+          <label for="show-current-b" class="text-xs font-bold text-green-500 cursor-pointer">電流の磁力線(緑)</label>
         </div>
       </div>
     </div>
@@ -170,6 +174,9 @@
     }
 
     function drawVectors(I, B0, poleWidth) {
+      let showVector = document.getElementById('show-vector-field').checked;
+      if (!showVector) return;
+
       let step = 40; 
       for (let y = step/2; y < height; y += step) {
         for (let x = step/2; x < width; x += step) {
@@ -184,15 +191,28 @@
           if (mag < 2) continue; 
           
           let dir = B.heading();
+          // 長さも磁場の強さに応じて変化
           let len = map(mag, 0, 150, 8, step * 0.8);
           len = constrain(len, 8, step * 0.8);
+          
+          // 磁束密度(mag)の大きさに応じて矢印の色(shade)と不透明度(alpha)を変更
+          // 強いほど黒(0)に近く、不透明度を高く(255)する
+          let shade = map(mag, 0, 250, 160, 0); 
+          shade = constrain(shade, 0, 160);
+          
+          let alpha = map(mag, 0, 250, 80, 255); 
+          alpha = constrain(alpha, 80, 255);
+          
+          // 強いところは線も少し太くする
+          let weight = map(mag, 0, 250, 1.5, 3.5);
+          weight = constrain(weight, 1.5, 3.5);
           
           push();
           translate(x, y);
           rotate(dir);
           
-          stroke(100, 100, 100, 180); 
-          strokeWeight(2);
+          stroke(shade, shade, shade, alpha); 
+          strokeWeight(weight);
           line(-len/2, 0, len/2, 0);
           line(len/2, 0, len/2 - 4, -3);
           line(len/2, 0, len/2 - 4, 3);
