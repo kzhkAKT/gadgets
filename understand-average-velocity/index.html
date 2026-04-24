@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="平均の速度と変位の関係を視覚的に理解できるインタラクティブ図解です。p5.jsを用いた物理学の学習ツールです。">
+  <meta property="og:title" content="平均の速度と変位 インタラクティブ図解">
+  <meta property="og:description" content="変位がグラフの面積で表されることをパズルのように直感的に確認できます。">
+  <meta property="og:type" content="website">
+  <title>平均の速度と変位 インタラクティブ図解</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <!-- KaTeXの読み込みを追加 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <style>
+    /* スライダーのカスタムスタイル */
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #3b82f6; /* Tailwind blue-500 */
+      cursor: pointer;
+      margin-top: -7px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 6px;
+      cursor: pointer;
+      background: #cbd5e1; /* Tailwind slate-300 */
+      border-radius: 3px;
+    }
+    input[type=range]:focus {
+      outline: none;
+    }
+    /* アニメーション用スライダーの特別色 */
+    #anim::-webkit-slider-thumb {
+      background: #ec4899; /* Tailwind pink-500 */
+      height: 24px;
+      width: 24px;
+      margin-top: -9px;
+    }
+    #anim::-webkit-slider-runnable-track {
+      background: #fbcfe8; /* Tailwind pink-200 */
+      height: 6px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen p-4 box-border">
+
+  <div class="flex flex-col md:flex-row h-full max-w-7xl mx-auto gap-4">
+    
+    <!-- 左側：コントロールパネル -->
+    <div class="w-full md:w-96 bg-white p-6 rounded-2xl shadow-md border border-slate-100 flex flex-col overflow-y-auto">
+      <h1 class="text-2xl font-bold mb-4 text-blue-700">平均の速度と変位</h1>
+      
+      <p class="mb-3 text-sm text-slate-600 leading-relaxed">
+        変位 <span id="label-displacement" class="inline-block bg-slate-100 px-1 rounded text-blue-700"></span> が、グラフの面積で表されることを確認しましょう。
+      </p>
+      <p class="mb-6 text-sm text-slate-600 leading-relaxed">
+        実際の運動が作る <strong>台形の面積</strong> と、平均の速度が作る <strong>長方形の面積</strong> が等しくなることを、パズルのように視覚的に確かめられます。
+      </p>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-1 text-slate-700 flex justify-between items-center">
+          <span id="label-v0-title">初速度 v₀ [m/s]</span>
+          <span id="val-v0" class="text-blue-600 font-mono">10.0</span>
+        </label>
+        <input type="range" id="v0" min="0" max="40" value="10" step="1">
+      </div>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-1 text-slate-700 flex justify-between items-center">
+          <span id="label-v1-title">終端速度 v₁ [m/s]</span>
+          <span id="val-v1" class="text-blue-600 font-mono">30.0</span>
+        </label>
+        <input type="range" id="v1" min="0" max="40" value="30" step="1">
+      </div>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-1 text-slate-700 flex justify-between items-center">
+          <span id="label-t1-title">経過時間 t₁ [s]</span>
+          <span id="val-t1" class="text-blue-600 font-mono">6.0</span>
+        </label>
+        <input type="range" id="t1" min="2" max="10" value="6" step="0.5">
+      </div>
+
+      <hr class="my-4 border-slate-200">
+      
+      <div class="mb-6 p-4 bg-pink-50 rounded-xl border border-pink-100">
+        <label class="block text-md font-bold mb-2 text-pink-700">【面積のパズル】</label>
+        <p class="text-xs text-pink-600 mb-3 font-medium">スライダーを動かして、飛び出た三角形の面積を移動させてみましょう。</p>
+        <input type="range" id="anim" min="0" max="100" value="0">
+      </div>
+      
+      <div class="bg-slate-100 p-4 rounded-xl border border-slate-200 text-sm mt-auto">
+        <div class="flex justify-between items-center mb-2">
+          <span class="font-semibold text-slate-600">平均の速度 v_avg:</span>
+          <span class="font-mono font-bold text-lg text-emerald-600"><span id="val-vavg">20.0</span> m/s</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="font-semibold text-slate-600">変位 (面積):</span>
+          <span class="font-mono font-bold text-lg text-blue-600"><span id="val-area">120.0</span> m</span>
+        </div>
+      </div>
+
+      <!-- 数式表示エリアを論理展開に合わせて分割 -->
+      <div class="mt-4 bg-white p-4 rounded-xl border border-blue-200 shadow-sm flex flex-col gap-2">
+        <h2 class="text-sm font-bold text-blue-800 border-b border-blue-100 pb-2">数式での確認</h2>
+        
+        <div class="text-xs text-slate-700">
+          <p class="mb-1 text-blue-700 font-semibold">① 長方形の面積 (平均の速度による変位)</p>
+          <div id="math-1" class="text-center my-1 text-slate-800"></div>
+          
+          <p class="mb-1 mt-3 text-red-700 font-semibold">② 台形の面積 (実際の変位)</p>
+          <div id="math-2" class="text-center my-1 text-slate-800"></div>
+          
+          <p class="mb-1 mt-3 font-semibold text-slate-600">①と②が等しいこと (長方形 ＝ 台形) から：</p>
+          <div id="math-3" class="text-center my-1"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 右側：キャンバス領域 -->
+    <div class="flex-1 bg-white rounded-2xl shadow-md border border-slate-100 relative overflow-hidden" id="canvas-container">
+      <!-- p5.jsのキャンバスがここに生成されます -->
+
+      <!-- キャンバス上のテキストをLaTeX表示するためのオーバーレイ要素 -->
+      <div id="label-real-v" class="absolute text-red-600 text-sm pointer-events-none transform -translate-y-full" style="display: none;"></div>
+      <div id="label-avg-v" class="absolute text-emerald-600 text-sm pointer-events-none transform -translate-y-1/2" style="display: none;"></div>
+      <div id="label-axis-t" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2" style="display: none;"></div>
+      <div id="label-axis-v" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full" style="display: none;"></div>
+      
+      <!-- v0, v1 ラベルを追加 -->
+      <div id="label-v0" class="absolute text-red-600 text-sm font-bold pointer-events-none bg-white/80 px-1 rounded" style="display: none;"></div>
+      <div id="label-v1" class="absolute text-red-600 text-sm font-bold pointer-events-none transform -translate-y-1/2 bg-white/80 px-1 rounded" style="display: none;"></div>
+
+      <!-- アニメーション完了メッセージ -->
+      <div id="label-complete" class="absolute text-blue-600 font-bold text-lg pointer-events-none text-center transform -translate-x-1/2 -translate-y-1/2 w-full drop-shadow-md bg-white/80 py-2" style="display: none;">
+        台形 (実際の変位) と 長方形 (平均の速度による変位)<br>の面積が完全に一致！
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const maxV = 45; // v軸の最大値
+    const maxT = 11; // t軸の最大値
+    const margin = { top: 60, right: 140, bottom: 60, left: 70 };
+    let container;
+    let lastV0 = -1, lastV1 = -1, lastT1 = -1; // 数式更新用の前回値保持
+
+    function setup() {
+      container = select('#canvas-container');
+      let canvas = createCanvas(container.width, container.height);
+      canvas.parent('canvas-container');
+      
+      // 静的なLaTeXラベルの初期化
+      let opts = { throwOnError: false };
+
+      // コントロールパネル内のテキストのLaTeX化
+      katex.render(`x_1 - x_0`, document.getElementById('label-displacement'), opts);
+      katex.render(`\\text{初速度 } v_0 \\; [\\mathrm{m/s}]`, document.getElementById('label-v0-title'), opts);
+      katex.render(`\\text{終端速度 } v_1 \\; [\\mathrm{m/s}]`, document.getElementById('label-v1-title'), opts);
+      katex.render(`\\text{経過時間 } t_1 \\; [\\mathrm{s}]`, document.getElementById('label-t1-title'), opts);
+
+      // キャンバス上のLaTeXラベルの初期化
+      katex.render(`\\text{実際の速度 } v(t)`, document.getElementById('label-real-v'), opts);
+      katex.render(`\\text{時間 } t \\; [\\mathrm{s}]`, document.getElementById('label-axis-t'), opts);
+      katex.render(`\\text{速度 } v \\; [\\mathrm{m/s}]`, document.getElementById('label-axis-v'), opts);
+      katex.render(`v_0`, document.getElementById('label-v0'), opts);
+      katex.render(`v_1`, document.getElementById('label-v1'), opts);
+
+      // ウィンドウサイズ変更時にキャンバスをリサイズ
+      windowResized = () => {
+        if(container) {
+          resizeCanvas(container.width, container.height);
+        }
+      };
+    }
+
+    // 論理座標(t)を画面座標(x)に変換
+    function tToX(t) {
+      return map(t, 0, maxT, margin.left, width - margin.right);
+    }
+
+    // 論理座標(v)を画面座標(y)に変換
+    function vToY(v) {
+      return map(v, 0, maxV, height - margin.bottom, margin.top);
+    }
+
+    function draw() {
+      background(255);
+      
+      // HTML要素から現在の値を取得
+      let v0 = parseFloat(select('#v0').elt.value);
+      let v1 = parseFloat(select('#v1').elt.value);
+      let t1 = parseFloat(select('#t1').elt.value);
+      let prog = parseFloat(select('#anim').elt.value) / 100;
+      
+      let vAvg = (v0 + v1) / 2;
+      let tMid = t1 / 2;
+      let area = vAvg * t1;
+      let isAccel = (v1 >= v0); // 加速か減速かの判定
+      
+      // UIのテキストを更新
+      select('#val-v0').html(v0.toFixed(1));
+      select('#val-v1').html(v1.toFixed(1));
+      select('#val-t1').html(t1.toFixed(1));
+      select('#val-vavg').html(vAvg.toFixed(1));
+      select('#val-area').html(area.toFixed(1));
+
+      // 値が変更された場合のみKaTeXで数式を更新
+      if (v0 !== lastV0 || v1 !== lastV1 || t1 !== lastT1) {
+        updateMath(v0, v1, t1, vAvg);
+        lastV0 = v0;
+        lastV1 = v1;
+        lastT1 = t1;
+      }
+
+      // 1. 座標軸とグリッドの描画
+      drawGrid();
+
+      // 2. 不変部分（台形と長方形が常に重なっている共通部分）の塗りつぶし
+      fill(186, 230, 253, 150); // 薄い水色
+      noStroke();
+      beginShape();
+      vertex(tToX(0), vToY(0));
+      vertex(tToX(t1), vToY(0));
+      vertex(tToX(t1), vToY(min(v1, vAvg)));
+      vertex(tToX(tMid), vToY(vAvg));
+      vertex(tToX(0), vToY(min(v0, vAvg)));
+      endShape(CLOSE);
+
+      let cX = tToX(tMid);
+      let cY = vToY(vAvg);
+
+      // 3. 空洞部分の枠線（三角形がはまる目的地）
+      stroke(148, 163, 184); // slate-400
+      strokeWeight(2);
+      drawingContext.setLineDash([5, 5]);
+      noFill();
+      if (isAccel) {
+        // 加速時：左側が空洞
+        triangle(cX, cY, tToX(0), vToY(vAvg), tToX(0), vToY(v0));
+      } else {
+        // 減速時：右側が空洞
+        triangle(cX, cY, tToX(t1), vToY(vAvg), tToX(t1), vToY(v1));
+      }
+      drawingContext.setLineDash([]); // 点線をリセット
+
+      // 4. アニメーションする三角形（飛び出ている部分）
+      push();
+      translate(cX, cY);
+      // 進行度に応じて中心点周りに回転
+      let angle = isAccel ? PI * prog : -PI * prog;
+      rotate(angle);
+      
+      fill(244, 114, 182, 200); // pink-400
+      noStroke();
+      if (isAccel) {
+        // 加速時：右側の三角形を描画（相対座標）
+        triangle(0, 0, tToX(t1) - cX, 0, tToX(t1) - cX, vToY(v1) - cY);
+      } else {
+        // 減速時：左側の三角形を描画（相対座標）
+        triangle(0, 0, tToX(0) - cX, 0, tToX(0) - cX, vToY(v0) - cY);
+      }
+      pop();
+
+      // 5. グラフの線と補助線の描画
+      // 時間 t1 の縦線
+      stroke(191, 219, 254); // blue-200
+      strokeWeight(2);
+      line(tToX(t1), vToY(0), tToX(t1), vToY(max(v1, v0)));
+
+      // 平均の速度の水平線（緑色）
+      stroke(16, 185, 129); // emerald-500
+      strokeWeight(3);
+      drawingContext.setLineDash([8, 4]);
+      line(tToX(0), vToY(vAvg), tToX(t1), vToY(vAvg));
+      drawingContext.setLineDash([]);
+
+      // 実際の速度のグラフ（赤色の直線）
+      stroke(239, 68, 68); // red-500
+      strokeWeight(3);
+      line(tToX(0), vToY(v0), tToX(t1), vToY(v1));
+
+      // 始点と終点の点（丸）を描画
+      fill(239, 68, 68);
+      noStroke();
+      circle(tToX(0), vToY(v0), 10);
+      circle(tToX(t1), vToY(v1), 10);
+
+      // 6. ラベルとテキストの描画 (KaTeXオーバーレイの座標更新)
+      let labelRealV = document.getElementById('label-real-v');
+      if (labelRealV) {
+        labelRealV.style.left = (tToX(t1) + 10) + 'px';
+        labelRealV.style.top = (vToY(v1) - 25) + 'px'; // v1と重ならないよう少し上に配置
+        labelRealV.style.display = 'block';
+      }
+
+      let labelV0 = document.getElementById('label-v0');
+      if (labelV0) {
+        labelV0.style.left = (tToX(0) + 8) + 'px';
+        labelV0.style.top = (vToY(v0) + 4) + 'px';
+        labelV0.style.display = 'block';
+      }
+
+      let labelV1 = document.getElementById('label-v1');
+      if (labelV1) {
+        labelV1.style.left = (tToX(t1) + 12) + 'px';
+        labelV1.style.top = vToY(v1) + 'px';
+        labelV1.style.display = 'block';
+      }
+
+      let labelAvgV = document.getElementById('label-avg-v');
+      if (labelAvgV) {
+        labelAvgV.style.left = (tToX(t1) + 10) + 'px';
+        labelAvgV.style.top = vToY(vAvg) + 'px';
+        labelAvgV.style.display = 'block';
+      }
+
+      let labelAxisT = document.getElementById('label-axis-t');
+      if (labelAxisT) {
+        labelAxisT.style.left = (width / 2) + 'px';
+        labelAxisT.style.top = (height - margin.bottom + 35) + 'px';
+        labelAxisT.style.display = 'block';
+      }
+
+      let labelAxisV = document.getElementById('label-axis-v');
+      if (labelAxisV) {
+        labelAxisV.style.left = margin.left + 'px';
+        labelAxisV.style.top = (margin.top - 10) + 'px';
+        labelAxisV.style.display = 'block';
+      }
+
+      // アニメーション完了時のメッセージ
+      let labelComplete = document.getElementById('label-complete');
+      if (labelComplete) {
+        if (prog > 0.95) {
+          labelComplete.style.left = (width / 2) + 'px';
+          labelComplete.style.top = (margin.top / 2) + 'px';
+          labelComplete.style.display = 'block';
+        } else {
+          labelComplete.style.display = 'none';
+        }
+      }
+    }
+
+    function drawGrid() {
+      stroke(226, 232, 240); // slate-200
+      strokeWeight(1);
+      // 縦線
+      for (let t = 0; t <= maxT; t++) {
+        let x = tToX(t);
+        line(x, margin.top, x, height - margin.bottom);
+      }
+      // 横線
+      for (let v = 0; v <= maxV; v += 10) {
+        let y = vToY(v);
+        line(margin.left, y, width - margin.right, y);
+      }
+      
+      // 軸線
+      stroke(100, 116, 139); // slate-500
+      strokeWeight(2);
+      line(margin.left, height - margin.bottom, width - margin.right, height - margin.bottom); // x軸
+      line(margin.left, margin.top, margin.left, height - margin.bottom); // y軸
+      
+      // 目盛りラベル
+      fill(100, 116, 139);
+      noStroke();
+      textSize(14);
+      textAlign(CENTER, TOP);
+      // (元の p5.js によるテキスト描画は削除し、数値のみ残します)
+      for (let t = 0; t <= maxT; t += 2) {
+        text(t, tToX(t), height - margin.bottom + 8);
+      }
+      
+      textAlign(RIGHT, CENTER);
+      for (let v = 0; v <= maxV; v += 10) {
+        text(v, margin.left - 10, vToY(v));
+      }
+    }
+
+    // KaTeXを用いて数式を動的に描画する関数
+    function updateMath(v0, v1, t1, vAvg) {
+      let v0f = v0.toFixed(1);
+      let v1f = v1.toFixed(1);
+      let t1f = t1.toFixed(1);
+      let vAvgf = vAvg.toFixed(1);
+
+      // 式1: 長方形の面積
+      let math1 = `x_1 - x_0 = \\overline{v}_{10} (t_1 - t_0)`;
+      
+      // 式2: 台形の面積
+      let math2 = `x_1 - x_0 = \\frac{1}{2} (v_0 + v_1)(t_1 - t_0)`;
+
+      // 式3: 展開と代入 (初期時刻 t0 = 0 とみなす)
+      let math3 = `\\begin{aligned}
+        \\overline{v}_{10} (t_1 - t_0) &= \\frac{1}{2} (v_0 + v_1)(t_1 - t_0) \\\\
+        ${vAvgf} \\times ${t1f} &= \\frac{1}{2} (${v0f} + ${v1f}) \\times ${t1f} \\\\
+        \\therefore \\overline{v}_{10} &= \\frac{${v0f} + ${v1f}}{2} = ${vAvgf}
+      \\end{aligned}`;
+
+      let opts = { displayMode: true, throwOnError: false };
+
+      let el1 = document.getElementById('math-1');
+      if (el1) katex.render(math1, el1, opts);
+
+      let el2 = document.getElementById('math-2');
+      if (el2) katex.render(math2, el2, opts);
+
+      let el3 = document.getElementById('math-3');
+      if (el3) katex.render(math3, el3, opts);
+
+      // キャンバス上の平均の速度ラベルの更新
+      let labelAvgV = document.getElementById('label-avg-v');
+      if (labelAvgV) {
+        katex.render(`\\begin{matrix} \\text{平均の速度 } \\overline{v}_{10} \\\\ = ${vAvgf} \\end{matrix}`, labelAvgV, { throwOnError: false });
+      }
+    }
+  </script>
+</body>
+</html>
