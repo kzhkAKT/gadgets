@@ -126,6 +126,16 @@
           <div id="math-3" class="text-center my-1"></div>
         </div>
       </div>
+
+      <!-- 添え字切り替えトグルスイッチ (目立たないように下部に配置) -->
+      <div class="mt-4 flex items-center justify-end gap-2 opacity-50 hover:opacity-100 transition-opacity cursor-default">
+        <span class="text-xs text-slate-500">添え字表記 (0,1 ⇔ 1,2)</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="toggle-index" class="sr-only peer" checked>
+          <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-400"></div>
+        </label>
+      </div>
+
     </div>
     
     <!-- 右側：キャンバス領域 -->
@@ -156,27 +166,22 @@
     const margin = { top: 60, right: 140, bottom: 60, left: 70 };
     let container;
     let lastV0 = -1, lastV1 = -1, lastT1 = -1; // 数式更新用の前回値保持
+    let useIndex12 = true; // 添え字の切り替え状態を初期でtrueに
 
     function setup() {
       container = select('#canvas-container');
       let canvas = createCanvas(container.width, container.height);
       canvas.parent('canvas-container');
       
+      // トグルスイッチのイベントリスナー
+      document.getElementById('toggle-index').addEventListener('change', (e) => {
+        useIndex12 = e.target.checked;
+        updateLabels();
+        lastV0 = -1; // 次のdrawループで数式を強制更新
+      });
+
       // 静的なLaTeXラベルの初期化
-      let opts = { throwOnError: false };
-
-      // コントロールパネル内のテキストのLaTeX化
-      katex.render(`x_1 - x_0`, document.getElementById('label-displacement'), opts);
-      katex.render(`\\text{初速度 } v_0 \\; [\\mathrm{m/s}]`, document.getElementById('label-v0-title'), opts);
-      katex.render(`\\text{終端速度 } v_1 \\; [\\mathrm{m/s}]`, document.getElementById('label-v1-title'), opts);
-      katex.render(`\\text{経過時間 } t_1 \\; [\\mathrm{s}]`, document.getElementById('label-t1-title'), opts);
-
-      // キャンバス上のLaTeXラベルの初期化
-      katex.render(`\\text{実際の速度 } v(t)`, document.getElementById('label-real-v'), opts);
-      katex.render(`\\text{時間 } t \\; [\\mathrm{s}]`, document.getElementById('label-axis-t'), opts);
-      katex.render(`\\text{速度 } v \\; [\\mathrm{m/s}]`, document.getElementById('label-axis-v'), opts);
-      katex.render(`v_0`, document.getElementById('label-v0'), opts);
-      katex.render(`v_1`, document.getElementById('label-v1'), opts);
+      updateLabels();
 
       // ウィンドウサイズ変更時にキャンバスをリサイズ
       windowResized = () => {
@@ -184,6 +189,26 @@
           resizeCanvas(container.width, container.height);
         }
       };
+    }
+
+    // ラベルのLaTeX表示を更新する関数
+    function updateLabels() {
+      let opts = { throwOnError: false };
+      let s0 = useIndex12 ? "1" : "0";
+      let s1 = useIndex12 ? "2" : "1";
+
+      // コントロールパネル内のテキストのLaTeX化
+      katex.render(`x_${s1} - x_${s0}`, document.getElementById('label-displacement'), opts);
+      katex.render(`\\text{初速度 } v_${s0} \\; [\\mathrm{m/s}]`, document.getElementById('label-v0-title'), opts);
+      katex.render(`\\text{終端速度 } v_${s1} \\; [\\mathrm{m/s}]`, document.getElementById('label-v1-title'), opts);
+      katex.render(`\\text{経過時間 } t_${s1} \\; [\\mathrm{s}]`, document.getElementById('label-t1-title'), opts);
+
+      // キャンバス上のLaTeXラベルの初期化
+      katex.render(`\\text{実際の速度 } v(t)`, document.getElementById('label-real-v'), opts);
+      katex.render(`\\text{時間 } t \\; [\\mathrm{s}]`, document.getElementById('label-axis-t'), opts);
+      katex.render(`\\text{速度 } v \\; [\\mathrm{m/s}]`, document.getElementById('label-axis-v'), opts);
+      katex.render(`v_${s0}`, document.getElementById('label-v0'), opts);
+      katex.render(`v_${s1}`, document.getElementById('label-v1'), opts);
     }
 
     // 論理座標(t)を画面座標(x)に変換
@@ -397,17 +422,21 @@
       let t1f = t1.toFixed(1);
       let vAvgf = vAvg.toFixed(1);
 
+      let s0 = useIndex12 ? "1" : "0";
+      let s1 = useIndex12 ? "2" : "1";
+      let vBar = `\\overline{v}_{${s1}${s0}}`;
+
       // 式1: 長方形の面積
-      let math1 = `x_1 - x_0 = \\overline{v}_{10} (t_1 - t_0)`;
+      let math1 = `x_${s1} - x_${s0} = ${vBar} (t_${s1} - t_${s0})`;
       
       // 式2: 台形の面積
-      let math2 = `x_1 - x_0 = \\frac{1}{2} (v_0 + v_1)(t_1 - t_0)`;
+      let math2 = `x_${s1} - x_${s0} = \\frac{1}{2} (v_${s0} + v_${s1})(t_${s1} - t_${s0})`;
 
       // 式3: 展開と代入 (初期時刻 t0 = 0 とみなす)
       let math3 = `\\begin{aligned}
-        \\overline{v}_{10} (t_1 - t_0) &= \\frac{1}{2} (v_0 + v_1)(t_1 - t_0) \\\\
+        ${vBar} (t_${s1} - t_${s0}) &= \\frac{1}{2} (v_${s0} + v_${s1})(t_${s1} - t_${s0}) \\\\
         ${vAvgf} \\times ${t1f} &= \\frac{1}{2} (${v0f} + ${v1f}) \\times ${t1f} \\\\
-        \\therefore \\overline{v}_{10} &= \\frac{${v0f} + ${v1f}}{2} = ${vAvgf}
+        \\therefore ${vBar} &= \\frac{${v0f} + ${v1f}}{2} = ${vAvgf}
       \\end{aligned}`;
 
       let opts = { displayMode: true, throwOnError: false };
@@ -424,7 +453,7 @@
       // キャンバス上の平均の速度ラベルの更新
       let labelAvgV = document.getElementById('label-avg-v');
       if (labelAvgV) {
-        katex.render(`\\begin{matrix} \\text{平均の速度 } \\overline{v}_{10} \\\\ = ${vAvgf} \\end{matrix}`, labelAvgV, { throwOnError: false });
+        katex.render(`\\begin{matrix} \\text{平均の速度 } ${vBar} \\\\ = ${vAvgf} \\end{matrix}`, labelAvgV, { throwOnError: false });
       }
     }
   </script>
