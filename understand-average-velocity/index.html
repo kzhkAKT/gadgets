@@ -67,7 +67,8 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans p-4 box-border min-h-screen">
 
-  <div class="flex flex-col-reverse lg:flex-row max-w-7xl mx-auto gap-4 min-h-[calc(100vh-2rem)]">
+  <!-- 高さが間延びしないよう lg:items-start を設定し、全体の高さをコンテンツに合わせる -->
+  <div class="flex flex-col-reverse lg:flex-row max-w-7xl mx-auto gap-4 lg:items-start">
     
     <!-- 左側：コントロールパネル -->
     <div class="w-full lg:w-96 shrink-0 bg-white p-5 lg:p-6 rounded-2xl shadow-md border border-slate-100 flex flex-col">
@@ -115,8 +116,6 @@
 
       <hr class="my-4 border-slate-200">
       
-      <!-- （ここにあった【面積のパズル】スライダーを削除し、右側に移動します） -->
-      
       <div class="bg-slate-100 p-4 rounded-xl border border-slate-200 text-sm mt-auto">
         <div class="flex justify-between items-center mb-2">
           <span class="font-semibold text-slate-600" id="label-vavg-title">平均の速度 v_avg:</span>
@@ -156,10 +155,12 @@
     </div>
     
     <!-- 右側エリア（キャンバス ＋ パズルパネル） -->
-    <div class="w-full lg:flex-1 flex flex-col sm:flex-row gap-4">
+    <!-- 高さを固定し、PC表示時はスクロール追従 (sticky) するように設定 -->
+    <div class="w-full lg:flex-1 flex flex-col sm:flex-row gap-4 sm:h-[450px] lg:h-[520px] lg:sticky lg:top-4">
       
       <!-- キャンバス領域 -->
-      <div class="flex-1 bg-white rounded-2xl shadow-md border border-slate-100 relative overflow-hidden min-h-[450px] lg:min-h-[600px]" id="canvas-container">
+      <!-- 高さを親要素に追従 (sm:h-full) させることで縦長になるのを防ぐ -->
+      <div class="flex-1 bg-white rounded-2xl shadow-md border border-slate-100 relative overflow-hidden h-[400px] sm:h-full" id="canvas-container">
         <!-- p5.jsのキャンバスがここに生成されます -->
 
         <!-- キャンバス上のテキストをLaTeX表示するためのオーバーレイ要素 -->
@@ -170,7 +171,7 @@
         <div id="label-v0" class="absolute text-red-600 text-sm font-bold pointer-events-none bg-white/80 px-1 rounded" style="display: none;"></div>
         <div id="label-v1" class="absolute text-red-600 text-sm font-bold pointer-events-none transform -translate-y-1/2 bg-white/80 px-1 rounded" style="display: none;"></div>
 
-        <!-- 追加: 時間の中点のラベル -->
+        <!-- 時間の中点のラベル -->
         <div id="label-tmid" class="absolute text-slate-600 text-sm pointer-events-none transform -translate-x-1/2" style="display: none;"></div>
         <div id="label-intersection" class="absolute text-slate-600 text-sm pointer-events-none bg-white/80 px-1 rounded" style="display: none;"></div>
 
@@ -180,24 +181,21 @@
         </div>
       </div>
 
-      <!-- 新設：面積のパズル（縦長配置：余白を自動計算して最大長まで拡張） -->
-      <div class="w-full sm:w-32 lg:w-36 shrink-0 bg-pink-50 p-3 sm:p-5 rounded-2xl border border-pink-100 flex flex-row sm:flex-col items-center justify-between shadow-md gap-3 sm:gap-4">
+      <!-- 面積のパズル -->
+      <div class="w-full sm:w-28 lg:w-32 shrink-0 bg-pink-50 p-3 sm:p-4 rounded-2xl border border-pink-100 flex flex-row sm:flex-col items-center justify-between shadow-md gap-3 sm:gap-4 sm:h-full">
         <div class="flex flex-col items-center gap-1 sm:gap-2">
           <label class="text-sm lg:text-base font-bold text-pink-700 text-center leading-tight whitespace-nowrap sm:whitespace-normal">面積の<br class="hidden sm:block lg:hidden">パズル</label>
           <label class="relative inline-flex items-center cursor-pointer">
-            <!-- 初期値を OFF にするため checked 属性を削除 -->
             <input type="checkbox" id="toggle-puzzle" class="sr-only peer">
             <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
           </label>
         </div>
         
-        <!-- flex-1 で親要素の空きスペースをすべて埋める -->
-        <div id="slider-wrapper" class="flex-1 w-full sm:w-10 relative flex items-center justify-center min-h-[50px] sm:min-h-[200px]">
-          <!-- 初期状態で操作不可にするため disabled 属性を追加 -->
+        <div id="slider-wrapper" class="flex-1 w-full sm:w-10 relative flex items-center justify-center min-h-[50px] sm:min-h-0 sm:h-full">
           <input type="range" id="anim" min="0" max="100" value="0" class="w-full sm:absolute sm:h-8 sm:-rotate-90 sm:origin-center cursor-pointer" disabled>
         </div>
         
-        <p class="hidden sm:block text-xs lg:text-sm text-pink-600 font-medium text-center leading-relaxed">
+        <p class="hidden sm:block text-[10px] lg:text-xs text-pink-600 font-medium text-center leading-relaxed">
           スライダーを<br class="hidden sm:block lg:hidden">上に動かして<br>図形を移動
         </p>
       </div>
@@ -254,13 +252,14 @@
       };
     }
     
-    // スライダーの長さを画面の余白スペースに合わせて自動で最大化する関数
+    // スライダーの長さを画面の余白スペースに合わせて自動で調整する関数
     function adjustSlider() {
       let wrapper = document.getElementById('slider-wrapper');
       let animSlider = document.getElementById('anim');
       if (wrapper && animSlider) {
         if (window.innerWidth >= 640) { // sm break point以上 (縦長表示時)
-          animSlider.style.width = wrapper.clientHeight + 'px';
+          // ラッパーの高さから少し余裕を引いた長さに設定
+          animSlider.style.width = Math.max(100, wrapper.clientHeight - 20) + 'px';
         } else { // スマホ等 (横長表示時)
           animSlider.style.width = '100%';
         }
