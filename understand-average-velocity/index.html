@@ -41,24 +41,36 @@
       outline: none;
     }
     /* アニメーション用スライダーの特別色 */
-    #anim::-webkit-slider-thumb {
+    #anim:not(:disabled)::-webkit-slider-thumb {
       background: #ec4899; /* Tailwind pink-500 */
       height: 24px;
       width: 24px;
       margin-top: -9px;
     }
-    #anim::-webkit-slider-runnable-track {
+    #anim:not(:disabled)::-webkit-slider-runnable-track {
       background: #fbcfe8; /* Tailwind pink-200 */
       height: 6px;
     }
+    #anim:disabled::-webkit-slider-thumb {
+      background: #cbd5e1; /* Tailwind slate-300 */
+      height: 24px;
+      width: 24px;
+      margin-top: -9px;
+      cursor: not-allowed;
+    }
+    #anim:disabled::-webkit-slider-runnable-track {
+      background: #e2e8f0; /* Tailwind slate-200 */
+      height: 6px;
+      cursor: not-allowed;
+    }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans h-screen p-4 box-border">
+<body class="bg-slate-50 text-slate-800 font-sans p-4 box-border min-h-screen">
 
-  <div class="flex flex-col md:flex-row h-full max-w-7xl mx-auto gap-4">
+  <div class="flex flex-col-reverse lg:flex-row max-w-7xl mx-auto gap-4 min-h-[calc(100vh-2rem)]">
     
     <!-- 左側：コントロールパネル -->
-    <div class="w-full md:w-96 bg-white p-6 rounded-2xl shadow-md border border-slate-100 flex flex-col overflow-y-auto">
+    <div class="w-full lg:w-96 shrink-0 bg-white p-5 lg:p-6 rounded-2xl shadow-md border border-slate-100 flex flex-col">
       <h1 class="text-2xl font-bold mb-4 text-blue-700">平均の速度と変位</h1>
       
       <p class="mb-3 text-sm text-slate-600 leading-relaxed">
@@ -94,19 +106,15 @@
 
       <hr class="my-4 border-slate-200">
       
-      <div class="mb-6 p-4 bg-pink-50 rounded-xl border border-pink-100">
-        <label class="block text-md font-bold mb-2 text-pink-700">【面積のパズル】</label>
-        <p class="text-xs text-pink-600 mb-3 font-medium">スライダーを動かして、飛び出た三角形の面積を移動させてみましょう。</p>
-        <input type="range" id="anim" min="0" max="100" value="0">
-      </div>
+      <!-- （ここにあった【面積のパズル】スライダーを削除し、右側に移動します） -->
       
       <div class="bg-slate-100 p-4 rounded-xl border border-slate-200 text-sm mt-auto">
         <div class="flex justify-between items-center mb-2">
-          <span class="font-semibold text-slate-600">平均の速度 v_avg:</span>
+          <span class="font-semibold text-slate-600" id="label-vavg-title">平均の速度 v_avg:</span>
           <span class="font-mono font-bold text-lg text-emerald-600"><span id="val-vavg">20.0</span> m/s</span>
         </div>
         <div class="flex justify-between items-center">
-          <span class="font-semibold text-slate-600">変位 (面積):</span>
+          <span class="font-semibold text-slate-600" id="label-area-title">変位 (面積):</span>
           <span class="font-mono font-bold text-lg text-blue-600"><span id="val-area">120.0</span> m</span>
         </div>
       </div>
@@ -138,24 +146,49 @@
 
     </div>
     
-    <!-- 右側：キャンバス領域 -->
-    <div class="flex-1 bg-white rounded-2xl shadow-md border border-slate-100 relative overflow-hidden" id="canvas-container">
-      <!-- p5.jsのキャンバスがここに生成されます -->
-
-      <!-- キャンバス上のテキストをLaTeX表示するためのオーバーレイ要素 -->
-      <div id="label-real-v" class="absolute text-red-600 text-sm pointer-events-none transform -translate-y-full" style="display: none;"></div>
-      <div id="label-avg-v" class="absolute text-emerald-600 text-sm pointer-events-none transform -translate-y-1/2" style="display: none;"></div>
-      <div id="label-axis-t" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2" style="display: none;"></div>
-      <div id="label-axis-v" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full" style="display: none;"></div>
+    <!-- 右側エリア（キャンバス ＋ パズルパネル） -->
+    <div class="w-full lg:flex-1 flex flex-col sm:flex-row gap-4">
       
-      <!-- v0, v1 ラベルを追加 -->
-      <div id="label-v0" class="absolute text-red-600 text-sm font-bold pointer-events-none bg-white/80 px-1 rounded" style="display: none;"></div>
-      <div id="label-v1" class="absolute text-red-600 text-sm font-bold pointer-events-none transform -translate-y-1/2 bg-white/80 px-1 rounded" style="display: none;"></div>
+      <!-- キャンバス領域 -->
+      <div class="flex-1 bg-white rounded-2xl shadow-md border border-slate-100 relative overflow-hidden min-h-[450px] lg:min-h-[600px]" id="canvas-container">
+        <!-- p5.jsのキャンバスがここに生成されます -->
 
-      <!-- アニメーション完了メッセージ -->
-      <div id="label-complete" class="absolute text-blue-600 font-bold text-lg pointer-events-none text-center transform -translate-x-1/2 -translate-y-1/2 w-full drop-shadow-md bg-white/80 py-2" style="display: none;">
-        台形 (実際の変位) と 長方形 (平均の速度による変位)<br>の面積が完全に一致！
+        <!-- キャンバス上のテキストをLaTeX表示するためのオーバーレイ要素 -->
+        <div id="label-real-v" class="absolute text-red-600 text-sm pointer-events-none transform -translate-y-full" style="display: none;"></div>
+        <div id="label-avg-v" class="absolute text-emerald-600 text-sm pointer-events-none transform -translate-y-1/2" style="display: none;"></div>
+        <div id="label-axis-t" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2" style="display: none;"></div>
+        <div id="label-axis-v" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full" style="display: none;"></div>
+        <div id="label-v0" class="absolute text-red-600 text-sm font-bold pointer-events-none bg-white/80 px-1 rounded" style="display: none;"></div>
+        <div id="label-v1" class="absolute text-red-600 text-sm font-bold pointer-events-none transform -translate-y-1/2 bg-white/80 px-1 rounded" style="display: none;"></div>
+
+        <!-- アニメーション完了メッセージ -->
+        <div id="label-complete" class="absolute text-blue-600 font-bold text-lg pointer-events-none text-center transform -translate-x-1/2 -translate-y-1/2 w-full drop-shadow-md bg-white/80 py-2" style="display: none;">
+          台形 (実際の変位) と 長方形 (平均の速度による変位)<br>の面積が完全に一致！
+        </div>
       </div>
+
+      <!-- 新設：面積のパズル（縦長配置：余白を自動計算して最大長まで拡張） -->
+      <div class="w-full sm:w-32 lg:w-36 shrink-0 bg-pink-50 p-3 sm:p-5 rounded-2xl border border-pink-100 flex flex-row sm:flex-col items-center justify-between shadow-md gap-3 sm:gap-4">
+        <div class="flex flex-col items-center gap-1 sm:gap-2">
+          <label class="text-sm lg:text-base font-bold text-pink-700 text-center leading-tight whitespace-nowrap sm:whitespace-normal">面積の<br class="hidden sm:block lg:hidden">パズル</label>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <!-- 初期値を OFF にするため checked 属性を削除 -->
+            <input type="checkbox" id="toggle-puzzle" class="sr-only peer">
+            <div class="w-8 h-4 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-pink-500"></div>
+          </label>
+        </div>
+        
+        <!-- flex-1 で親要素の空きスペースをすべて埋める -->
+        <div id="slider-wrapper" class="flex-1 w-full sm:w-10 relative flex items-center justify-center min-h-[50px] sm:min-h-[200px]">
+          <!-- 初期状態で操作不可にするため disabled 属性を追加 -->
+          <input type="range" id="anim" min="0" max="100" value="0" class="w-full sm:absolute sm:h-8 sm:-rotate-90 sm:origin-center cursor-pointer" disabled>
+        </div>
+        
+        <p class="hidden sm:block text-xs lg:text-sm text-pink-600 font-medium text-center leading-relaxed">
+          スライダーを<br class="hidden sm:block lg:hidden">上に動かして<br>図形を移動
+        </p>
+      </div>
+
     </div>
 
   </div>
@@ -170,7 +203,9 @@
 
     function setup() {
       container = select('#canvas-container');
-      let canvas = createCanvas(container.width, container.height);
+      let cw = container.elt.clientWidth;
+      let ch = container.elt.clientHeight;
+      let canvas = createCanvas(cw, ch);
       canvas.parent('canvas-container');
       
       // トグルスイッチのイベントリスナー
@@ -180,15 +215,43 @@
         lastV0 = -1; // 次のdrawループで数式を強制更新
       });
 
+      // パズルON/OFFのイベントリスナー
+      document.getElementById('toggle-puzzle').addEventListener('change', (e) => {
+        let animSlider = document.getElementById('anim');
+        if (e.target.checked) {
+          animSlider.disabled = false;
+        } else {
+          animSlider.value = 0; // スライダーを戻す
+          animSlider.disabled = true;
+        }
+      });
+
       // 静的なLaTeXラベルの初期化
       updateLabels();
+      
+      // スライダーの長さを空きスペースに最適化
+      setTimeout(adjustSlider, 50);
 
-      // ウィンドウサイズ変更時にキャンバスをリサイズ
+      // ウィンドウサイズ変更時にキャンバスをリサイズし、スライダーの長さも再計算
       windowResized = () => {
         if(container) {
-          resizeCanvas(container.width, container.height);
+          resizeCanvas(container.elt.clientWidth, container.elt.clientHeight);
+          adjustSlider();
         }
       };
+    }
+    
+    // スライダーの長さを画面の余白スペースに合わせて自動で最大化する関数
+    function adjustSlider() {
+      let wrapper = document.getElementById('slider-wrapper');
+      let animSlider = document.getElementById('anim');
+      if (wrapper && animSlider) {
+        if (window.innerWidth >= 640) { // sm break point以上 (縦長表示時)
+          animSlider.style.width = wrapper.clientHeight + 'px';
+        } else { // スマホ等 (横長表示時)
+          animSlider.style.width = '100%';
+        }
+      }
     }
 
     // ラベルのLaTeX表示を更新する関数
@@ -196,19 +259,32 @@
       let opts = { throwOnError: false };
       let s0 = useIndex12 ? "1" : "0";
       let s1 = useIndex12 ? "2" : "1";
+      let vBar = `\\overline{v}_{${s1}${s0}}`;
+
+      // エラーを防ぐため DOM を直接操作せず文字列として HTML を流し込む
+      const safeRender = (latexStr, elementId) => {
+        let el = document.getElementById(elementId);
+        if (el) {
+          el.innerHTML = katex.renderToString(latexStr, opts);
+        }
+      };
 
       // コントロールパネル内のテキストのLaTeX化
-      katex.render(`x_${s1} - x_${s0}`, document.getElementById('label-displacement'), opts);
-      katex.render(`\\text{初速度 } v_${s0} \\; [\\mathrm{m/s}]`, document.getElementById('label-v0-title'), opts);
-      katex.render(`\\text{終端速度 } v_${s1} \\; [\\mathrm{m/s}]`, document.getElementById('label-v1-title'), opts);
-      katex.render(`\\text{経過時間 } t_${s1} \\; [\\mathrm{s}]`, document.getElementById('label-t1-title'), opts);
+      safeRender(`x_${s1} - x_${s0}`, 'label-displacement');
+      safeRender(`\\text{初速度 } v_${s0} \\; [\\mathrm{m/s}]`, 'label-v0-title');
+      safeRender(`\\text{終端速度 } v_${s1} \\; [\\mathrm{m/s}]`, 'label-v1-title');
+      safeRender(`\\text{経過時間 } t_${s1} \\; [\\mathrm{s}]`, 'label-t1-title');
+
+      // 計算結果エリアのラベルのLaTeX化
+      safeRender(`\\text{平均の速度 } ${vBar}:`, 'label-vavg-title');
+      safeRender(`\\text{変位 (面積)}:`, 'label-area-title');
 
       // キャンバス上のLaTeXラベルの初期化
-      katex.render(`\\text{実際の速度 } v(t)`, document.getElementById('label-real-v'), opts);
-      katex.render(`\\text{時間 } t \\; [\\mathrm{s}]`, document.getElementById('label-axis-t'), opts);
-      katex.render(`\\text{速度 } v \\; [\\mathrm{m/s}]`, document.getElementById('label-axis-v'), opts);
-      katex.render(`v_${s0}`, document.getElementById('label-v0'), opts);
-      katex.render(`v_${s1}`, document.getElementById('label-v1'), opts);
+      safeRender(`\\text{実際の速度 } v(t)`, 'label-real-v');
+      safeRender(`\\text{時間 } t \\; [\\mathrm{s}]`, 'label-axis-t');
+      safeRender(`\\text{速度 } v \\; [\\mathrm{m/s}]`, 'label-axis-v');
+      safeRender(`v_${s0}`, 'label-v0');
+      safeRender(`v_${s1}`, 'label-v1');
     }
 
     // 論理座標(t)を画面座標(x)に変換
@@ -250,6 +326,8 @@
         lastT1 = t1;
       }
 
+      let isPuzzleOn = select('#toggle-puzzle').elt.checked;
+
       // 1. 座標軸とグリッドの描画
       drawGrid();
 
@@ -268,18 +346,20 @@
       let cY = vToY(vAvg);
 
       // 3. 空洞部分の枠線（三角形がはまる目的地）
-      stroke(148, 163, 184); // slate-400
-      strokeWeight(2);
-      drawingContext.setLineDash([5, 5]);
-      noFill();
-      if (isAccel) {
-        // 加速時：左側が空洞
-        triangle(cX, cY, tToX(0), vToY(vAvg), tToX(0), vToY(v0));
-      } else {
-        // 減速時：右側が空洞
-        triangle(cX, cY, tToX(t1), vToY(vAvg), tToX(t1), vToY(v1));
+      if (isPuzzleOn) {
+        stroke(148, 163, 184); // slate-400
+        strokeWeight(2);
+        drawingContext.setLineDash([5, 5]);
+        noFill();
+        if (isAccel) {
+          // 加速時：左側が空洞
+          triangle(cX, cY, tToX(0), vToY(vAvg), tToX(0), vToY(v0));
+        } else {
+          // 減速時：右側が空洞
+          triangle(cX, cY, tToX(t1), vToY(vAvg), tToX(t1), vToY(v1));
+        }
+        drawingContext.setLineDash([]); // 点線をリセット
       }
-      drawingContext.setLineDash([]); // 点線をリセット
 
       // 4. アニメーションする三角形（飛び出ている部分）
       push();
@@ -288,7 +368,11 @@
       let angle = isAccel ? PI * prog : -PI * prog;
       rotate(angle);
       
-      fill(244, 114, 182, 200); // pink-400
+      if (isPuzzleOn) {
+        fill(244, 114, 182, 200); // pink-400
+      } else {
+        fill(186, 230, 253, 150); // 薄い水色
+      }
       noStroke();
       if (isAccel) {
         // 加速時：右側の三角形を描画（相対座標）
@@ -441,19 +525,20 @@
 
       let opts = { displayMode: true, throwOnError: false };
 
+      // エラーを防ぐため、HTML 文字列を生成してから innerHTML に流し込む
       let el1 = document.getElementById('math-1');
-      if (el1) katex.render(math1, el1, opts);
+      if (el1) el1.innerHTML = katex.renderToString(math1, opts);
 
       let el2 = document.getElementById('math-2');
-      if (el2) katex.render(math2, el2, opts);
+      if (el2) el2.innerHTML = katex.renderToString(math2, opts);
 
       let el3 = document.getElementById('math-3');
-      if (el3) katex.render(math3, el3, opts);
+      if (el3) el3.innerHTML = katex.renderToString(math3, opts);
 
       // キャンバス上の平均の速度ラベルの更新
       let labelAvgV = document.getElementById('label-avg-v');
       if (labelAvgV) {
-        katex.render(`\\begin{matrix} \\text{平均の速度 } ${vBar} \\\\ = ${vAvgf} \\end{matrix}`, labelAvgV, { throwOnError: false });
+        labelAvgV.innerHTML = katex.renderToString(`\\begin{matrix} \\text{平均の速度 } ${vBar} \\\\ = ${vAvgf} \\end{matrix}`, { throwOnError: false });
       }
     }
   </script>
