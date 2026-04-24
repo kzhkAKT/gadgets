@@ -104,6 +104,15 @@
         <input type="range" id="t1" min="2" max="10" value="6" step="0.5">
       </div>
 
+      <!-- 追加: 時間の平均点（中点）を表示するトグル -->
+      <div class="mb-4 flex items-center justify-between bg-slate-100 p-2.5 rounded-lg border border-slate-200">
+        <span class="text-sm font-semibold text-slate-700">時間の中点 (平均点) を表示</span>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="toggle-midpoint" class="sr-only peer">
+          <div class="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
+        </label>
+      </div>
+
       <hr class="my-4 border-slate-200">
       
       <!-- （ここにあった【面積のパズル】スライダーを削除し、右側に移動します） -->
@@ -160,6 +169,10 @@
         <div id="label-axis-v" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full" style="display: none;"></div>
         <div id="label-v0" class="absolute text-red-600 text-sm font-bold pointer-events-none bg-white/80 px-1 rounded" style="display: none;"></div>
         <div id="label-v1" class="absolute text-red-600 text-sm font-bold pointer-events-none transform -translate-y-1/2 bg-white/80 px-1 rounded" style="display: none;"></div>
+
+        <!-- 追加: 時間の中点のラベル -->
+        <div id="label-tmid" class="absolute text-slate-600 text-sm pointer-events-none transform -translate-x-1/2" style="display: none;"></div>
+        <div id="label-intersection" class="absolute text-slate-600 text-sm pointer-events-none bg-white/80 px-1 rounded" style="display: none;"></div>
 
         <!-- アニメーション完了メッセージ -->
         <div id="label-complete" class="absolute text-blue-600 font-bold text-lg pointer-events-none text-center transform -translate-x-1/2 -translate-y-1/2 w-full drop-shadow-md bg-white/80 py-2" style="display: none;">
@@ -285,6 +298,10 @@
       safeRender(`\\text{速度 } v \\; [\\mathrm{m/s}]`, 'label-axis-v');
       safeRender(`v_${s0}`, 'label-v0');
       safeRender(`v_${s1}`, 'label-v1');
+
+      // 中点用のラベル更新
+      safeRender(`t_m = \\frac{t_${s1}}{2}`, 'label-tmid');
+      safeRender(`v(t_m)`, 'label-intersection');
     }
 
     // 論理座標(t)を画面座標(x)に変換
@@ -407,6 +424,20 @@
       circle(tToX(0), vToY(v0), 10);
       circle(tToX(t1), vToY(v1), 10);
 
+      // 時間の中点（平均点）の描画
+      let isMidpointOn = select('#toggle-midpoint').elt.checked;
+      if (isMidpointOn) {
+        stroke(100, 116, 139); // slate-500
+        strokeWeight(1.5);
+        drawingContext.setLineDash([4, 4]);
+        line(tToX(tMid), vToY(0), tToX(tMid), vToY(vAvg));
+        drawingContext.setLineDash([]);
+        
+        fill(100, 116, 139);
+        noStroke();
+        circle(tToX(tMid), vToY(vAvg), 8);
+      }
+
       // 6. ラベルとテキストの描画 (KaTeXオーバーレイの座標更新)
       let labelRealV = document.getElementById('label-real-v');
       if (labelRealV) {
@@ -448,6 +479,28 @@
         labelAxisV.style.left = margin.left + 'px';
         labelAxisV.style.top = (margin.top - 10) + 'px';
         labelAxisV.style.display = 'block';
+      }
+
+      let labelTmid = document.getElementById('label-tmid');
+      if (labelTmid) {
+        if (isMidpointOn) {
+          labelTmid.style.left = tToX(tMid) + 'px';
+          labelTmid.style.top = (height - margin.bottom + 8) + 'px';
+          labelTmid.style.display = 'block';
+        } else {
+          labelTmid.style.display = 'none';
+        }
+      }
+
+      let labelIntersection = document.getElementById('label-intersection');
+      if (labelIntersection) {
+        if (isMidpointOn) {
+          labelIntersection.style.left = (tToX(tMid) + 8) + 'px';
+          labelIntersection.style.top = (vToY(vAvg) - 24) + 'px';
+          labelIntersection.style.display = 'block';
+        } else {
+          labelIntersection.style.display = 'none';
+        }
       }
 
       // アニメーション完了時のメッセージ
