@@ -84,9 +84,17 @@
       <div class="mb-4">
         <label class="block text-sm font-semibold mb-1 text-slate-700 flex justify-between items-center">
           <span id="label-v0-title">初速度 v₀ [m/s]</span>
-          <span id="val-v0" class="text-blue-600 font-mono">10.0</span>
+          <span id="val-v0" class="text-blue-600 font-mono">20.0</span>
         </label>
-        <input type="range" id="v0" min="0" max="40" value="10" step="1">
+        <input type="range" id="v0" min="0" max="40" value="20" step="1">
+      </div>
+      
+      <div class="mb-4">
+        <label class="block text-sm font-semibold mb-1 text-slate-700 flex justify-between items-center">
+          <span id="label-v1-title">終端速度 v₁ [m/s]</span>
+          <span id="val-v1" class="text-blue-600 font-mono">20.0</span>
+        </label>
+        <input type="range" id="v1" min="0" max="40" value="20" step="1">
       </div>
       
       <div class="mb-4">
@@ -169,7 +177,7 @@
         <div id="label-axis-t" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2" style="display: none;"></div>
         <div id="label-axis-v" class="absolute text-slate-500 text-sm pointer-events-none transform -translate-x-1/2 -translate-y-full" style="display: none;"></div>
         <div id="label-v0" class="absolute text-red-600 text-sm font-bold pointer-events-none bg-white/80 px-1 rounded" style="display: none;"></div>
-        <div id="label-v1" class="absolute text-red-600 text-sm font-bold pointer-events-none transform -translate-y-1/2 bg-white/80 px-1 rounded" style="display: none;"></div>
+        <div id="label-v1" class="absolute text-red-600 text-sm font-bold pointer-events-none transform -translate-x-full -translate-y-full bg-white/80 px-1 rounded" style="display: none;"></div>
 
         <!-- 時間の中点のラベル -->
         <div id="label-tmid" class="absolute text-slate-600 text-sm pointer-events-none transform -translate-x-1/2" style="display: none;"></div>
@@ -454,8 +462,8 @@
 
       let labelV1 = document.getElementById('label-v1');
       if (labelV1) {
-        labelV1.style.left = (tToX(t1) + 12) + 'px';
-        labelV1.style.top = vToY(v1) + 'px';
+        labelV1.style.left = (tToX(t1) - 8) + 'px';
+        labelV1.style.top = (vToY(v1) - 8) + 'px';
         labelV1.style.display = 'block';
       }
 
