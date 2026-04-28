@@ -1,5 +1,6 @@
 ---
 layout: default
+title: gadgets
 ---
 
 <div id="readme-content"></div>
