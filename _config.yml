@@ -1,8 +1,2 @@
-theme: minima
-
-markdown: kramdown
 kramdown:
   input: GFM
-
-baseurl: "/gadgets"
-url: "https://kzhkakt.github.io"
