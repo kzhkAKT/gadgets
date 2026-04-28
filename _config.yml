@@ -4,5 +4,5 @@ markdown: kramdown
 kramdown:
   input: GFM
 
-baseurl: "/repos"   # github.io/repos の場合
-url: "https://yourname.github.io"
+baseurl: "/gadgets"
+url: "https://kzhkakt.github.io"
