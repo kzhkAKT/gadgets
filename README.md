@@ -17,3 +17,4 @@ Javascript Gadgets Data Repository
 1. https://kzhkakt.github.io/gadgets/lorentz-force-sim
 1. https://kzhkakt.github.io/gadgets/understand-average-velocity
 1. https://kzhkakt.github.io/gadgets/medium-dy-dydt
+1. https://kzhkakt.github.io/gadgets/medium-dv-dvdt

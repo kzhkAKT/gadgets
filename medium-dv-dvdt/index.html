@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>正弦進行波と媒質の速度・平均加速度</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* スライダーのカスタマイズ */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+      width: 100%;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #2563eb;
+      cursor: pointer;
+      margin-top: -6px;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      cursor: pointer;
+      background: #e2e8f0;
+      border-radius: 2px;
+    }
+    input[type=range]:focus {
+      outline: none;
+    }
+  </style>
+</head>
+<body class="bg-[#f8f9fa] text-slate-800 font-sans min-h-screen flex flex-col items-center py-8">
+
+  <h1 class="text-2xl font-bold mb-6 text-slate-800">正弦進行波と媒質の速度・平均加速度</h1>
+  
+  <!-- キャンバスエリア -->
+  <div class="bg-white p-2 rounded-sm shadow-sm border border-slate-200 mb-4 inline-block">
+    <canvas id="waveCanvas" width="800" height="700" class="block"></canvas>
+  </div>
+
+  <!-- コントロールバー (画像のデザインを踏襲) -->
+  <div class="bg-white px-6 py-4 rounded-lg shadow-sm border border-slate-200 flex items-center justify-between w-[800px]">
+    
+    <button id="playBtn" class="bg-[#2563eb] hover:bg-blue-700 text-white px-8 py-2 rounded font-bold text-sm transition-colors shadow-sm w-28">
+      再生
+    </button>
+    
+    <div class="flex items-center gap-8">
+      <!-- スロー再生トグル -->
+      <label class="flex items-center cursor-pointer gap-3">
+        <div class="relative w-10 h-5">
+          <input type="checkbox" id="slowMotion" class="sr-only peer">
+          <div class="block bg-gray-300 w-full h-full rounded-full peer-checked:bg-blue-500 transition-colors"></div>
+          <div class="absolute top-[2px] left-[2px] bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-5 shadow-sm"></div>
+        </div>
+        <span class="text-sm font-bold text-slate-700">スロー再生</span>
+      </label>
+      
+      <!-- 波の速さスライダー -->
+      <div class="flex items-center gap-3">
+        <label class="text-sm font-bold text-slate-700">波の速さ:</label>
+        <input type="range" id="waveSpeed" min="20" max="200" step="10" value="100" class="w-24">
+        <span id="speedVal" class="text-sm font-mono w-6 text-right text-slate-600">100</span>
+      </div>
+      
+      <!-- 微小時間スライダー -->
+      <div class="flex items-center gap-3">
+        <label class="text-sm font-bold text-slate-700">微小時間 &Delta;t:</label>
+        <input type="range" id="dtSlider" min="0.01" max="1.50" step="0.01" value="0.25" class="w-40">
+        <span id="dtVal" class="text-sm font-mono w-10 text-right text-slate-600">0.25</span>
+      </div>
+    </div>
+    
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const canvas = document.getElementById("waveCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // UI要素
+      const playBtn = document.getElementById("playBtn");
+      const slowMotion = document.getElementById("slowMotion");
+      const waveSpeed = document.getElementById("waveSpeed");
+      const dtSlider = document.getElementById("dtSlider");
+      const speedVal = document.getElementById("speedVal");
+      const dtVal = document.getElementById("dtVal");
+
+      // シミュレーション定数
+      const A = 60;          // 波の振幅
+      const lambda = 320;    // 波長
+      const k = 2 * Math.PI / lambda; // 波数
+      
+      // ベクトルの表示倍率（画面に収まるよう調整）
+      const V_SCALE = 0.5;
+      const A_SCALE = 0.2;
+
+      // 状態変数
+      let isPlaying = false;
+      let time = 0;
+      let lastTime = performance.now();
+
+      // UIイベント
+      playBtn.addEventListener("click", () => {
+        isPlaying = !isPlaying;
+        playBtn.textContent = isPlaying ? "一時停止" : "再生";
+        if (isPlaying) lastTime = performance.now();
+      });
+
+      waveSpeed.addEventListener("input", () => speedVal.textContent = waveSpeed.value);
+      dtSlider.addEventListener("input", () => dtVal.textContent = Number(dtSlider.value).toFixed(2));
+
+      // 矢印描画ユーティリティ
+      function drawArrow(fromX, fromY, toX, toY, color) {
+        const dx = toX - fromX;
+        const dy = toY - fromY;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        
+        if (len < 1) return; // 短すぎる場合は描画しない
+
+        const headlen = Math.min(8, len * 0.3);
+        const angle = Math.atan2(dy, dx);
+
+        ctx.beginPath();
+        ctx.moveTo(fromX, fromY);
+        ctx.lineTo(toX, toY);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(toX, toY);
+        ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6));
+        ctx.lineTo(toX, toY);
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
+
+      // 描画メイン処理
+      function render() {
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+
+        const yTop = height * 0.25; // 上段グラフの基準y座標
+        const yBot = height * 0.75; // 下段グラフの基準y座標
+        const marginX = 80;         // 左マージン
+
+        // --- 1. グリッドと軸の描画 ---
+        ctx.beginPath();
+        ctx.strokeStyle = "#e2e8f0"; // 薄いグレー
+        ctx.lineWidth = 1;
+        // 縦線・横線
+        for (let x = 0; x <= width; x += 20) {
+          ctx.moveTo(x, 0); ctx.lineTo(x, height);
+        }
+        for (let y = 0; y <= height; y += 20) {
+          ctx.moveTo(0, y); ctx.lineTo(width, y);
+        }
+        ctx.stroke();
+
+        // X軸・Y軸 (黒線)
+        ctx.beginPath();
+        ctx.strokeStyle = "#1e293b";
+        ctx.lineWidth = 1.5;
+        // 上段軸
+        ctx.moveTo(marginX, yTop); ctx.lineTo(width - 20, yTop); // x軸
+        ctx.moveTo(marginX, yTop - 120); ctx.lineTo(marginX, yTop + 120); // y軸
+        // 下段軸
+        ctx.moveTo(marginX, yBot); ctx.lineTo(width - 20, yBot); // x軸
+        ctx.moveTo(marginX, yBot - 120); ctx.lineTo(marginX, yBot + 120); // y軸
+        ctx.stroke();
+
+        // 軸の矢印
+        drawArrow(width - 20, yTop, width - 10, yTop, "#1e293b");
+        drawArrow(marginX, yTop - 120, marginX, yTop - 130, "#1e293b");
+        drawArrow(width - 20, yBot, width - 10, yBot, "#1e293b");
+        drawArrow(marginX, yBot - 120, marginX, yBot - 130, "#1e293b");
+
+        // 軸ラベル
+        ctx.font = "16px sans-serif";
+        ctx.fillStyle = "#1e293b";
+        ctx.fillText("x", width - 20, yTop + 20);
+        ctx.fillText("y", marginX - 20, yTop - 120);
+        ctx.fillText("x", width - 20, yBot + 20);
+        ctx.fillText("Δv / Δt", marginX - 60, yBot - 120);
+
+
+        // --- 2. 物理量の計算 ---
+        const c = parseFloat(waveSpeed.value); // 波の速さ (スロー再生でも物理的な速度は変えない)
+        const dt = parseFloat(dtSlider.value);
+        const omega = k * c; // 角振動数
+
+
+        // --- 3. 波形の描画 (上段) ---
+        // y(x, t) - 破線グレー (時間的にはじめ)
+        ctx.beginPath();
+        for (let x = marginX; x <= width - 40; x++) {
+          let y = A * Math.sin(k * (x - marginX) - omega * time);
+          x === marginX ? ctx.moveTo(x, yTop - y) : ctx.lineTo(x, yTop - y);
+        }
+        ctx.strokeStyle = "#94a3b8"; // slate-400
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // y(x, t + Δt) - 実線黒 (時間的に後)
+        ctx.beginPath();
+        for (let x = marginX; x <= width - 40; x++) {
+          let y = A * Math.sin(k * (x - marginX) - omega * (time + dt));
+          x === marginX ? ctx.moveTo(x, yTop - y) : ctx.lineTo(x, yTop - y);
+        }
+        ctx.strokeStyle = "#0f172a"; // slate-900
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // 波形ラベル
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "14px sans-serif";
+        ctx.fillText("y(x, t + Δt)", width - 120, yTop - 70);
+        ctx.fillStyle = "#64748b";
+        ctx.fillText("y(x, t)", width - 120, yTop - 50);
+
+
+        // --- 4. 平均加速度の波形描画 (下段) ---
+        ctx.beginPath();
+        for (let x = marginX; x <= width - 40; x++) {
+          let v_t = -A * omega * Math.cos(k * (x - marginX) - omega * time);
+          let v_tdt = -A * omega * Math.cos(k * (x - marginX) - omega * (time + dt));
+          let a_avg = (v_tdt - v_t) / dt;
+          
+          let drawY = yBot - a_avg * A_SCALE;
+          x === marginX ? ctx.moveTo(x, drawY) : ctx.lineTo(x, drawY);
+        }
+        ctx.strokeStyle = "#ef4444"; // red-500
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+
+        // --- 5. 媒質点でのベクトル描画 ---
+        // 40px間隔でベクトルを描画
+        for (let x = marginX; x <= width - 40; x += 40) {
+          // 変位
+          let y_t = A * Math.sin(k * (x - marginX) - omega * time);
+          let y_tdt = A * Math.sin(k * (x - marginX) - omega * (time + dt));
+          
+          // 速度
+          let v_t = -A * omega * Math.cos(k * (x - marginX) - omega * time);
+          let v_tdt = -A * omega * Math.cos(k * (x - marginX) - omega * (time + dt));
+          
+          // 平均加速度
+          let a_avg = (v_tdt - v_t) / dt;
+
+          // 上段：変位ベクトル (青) - 破線から実線へ
+          let screenY_start = yTop - y_t;
+          let screenY_end = yTop - y_tdt;
+          drawArrow(x, screenY_start, x, screenY_end, "#2563eb");
+          
+          // 媒質の点 (青緑) は破線(時間t)上に描画
+          ctx.beginPath();
+          ctx.arc(x, screenY_start, 3, 0, Math.PI * 2);
+          ctx.fillStyle = "#059669";
+          ctx.fill();
+
+          // 下段：平均加速度ベクトル (赤)
+          // 中心軸から伸びる
+          drawArrow(x, yBot, x, yBot - a_avg * A_SCALE, "#dc2626");
+        }
+
+
+        // --- 6. 凡例テキスト ---
+        ctx.font = "12px sans-serif";
+        ctx.fillStyle = "#2563eb"; // 青
+        ctx.fillText("青矢印: 変位 Δy (平均速度に比例)", marginX + 20, 30);
+        ctx.fillStyle = "#dc2626"; // 赤
+        ctx.fillText("赤矢印: 平均加速度 Δv / Δt", marginX + 20, 50);
+      }
+
+      // アニメーションループ
+      function animate(currentTime) {
+        if (isPlaying) {
+          let delta = (currentTime - lastTime) / 1000;
+          if (delta > 0.1) delta = 0.1; // タブ復帰時の飛躍防止
+          
+          // スロー再生時はシミュレーション上の時間の進みを遅くする
+          const timeScale = slowMotion.checked ? 0.2 : 1.0;
+          time += delta * timeScale;
+        }
+        lastTime = currentTime;
+
+        render();
+        requestAnimationFrame(animate);
+      }
+
+      // 初回描画とループ開始
+      render();
+      requestAnimationFrame(animate);
+    });
+  </script>
+</body>
+</html>
