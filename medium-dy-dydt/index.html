@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- 【セキュリティ最適化】 Content Security Policy (CSP) の設定 
+       ※指定したCDNとインラインスクリプト以外からのコード実行をブロックし、XSS攻撃を軽減します -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:;">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  
+  <title>正弦進行波の媒質の平均速度シミュレーター</title>
+  
+  <!-- 【パフォーマンス最適化】 p5.jsのminify(圧縮)版を読み込み、ファイルサイズを削減。crossoriginを追加。 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  
+  <!-- Tailwind CSS (※単一ファイルで完結させるためCDN版を利用。本格的な本番運用時はTailwind CLI等でのビルドを推奨) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex flex-col items-center py-8 font-sans text-gray-800">
+
+  <h1 class="text-2xl font-bold mb-6">正弦進行波と媒質の平均速度</h1>
+
+  <!-- キャンバスのコンテナ -->
+  <div id="canvas-container" class="shadow-lg bg-white mb-6 border border-gray-300"></div>
+
+  <!-- UIコントロールパネル -->
+  <div class="bg-white p-6 rounded-lg shadow-md flex flex-wrap gap-8 items-center justify-center border border-gray-200">
+    <button id="play-btn" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition w-32 focus:outline-none focus:ring-2 focus:ring-blue-400">
+      再生
+    </button>
+
+    <label for="slow-switch" class="flex items-center cursor-pointer">
+      <div class="relative">
+        <input type="checkbox" id="slow-switch" class="sr-only peer">
+        <div class="w-10 h-6 bg-gray-300 rounded-full peer peer-checked:bg-blue-600 transition-colors"></div>
+        <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-4"></div>
+      </div>
+      <span class="ml-3 font-semibold text-gray-700">スロー再生</span>
+    </label>
+    
+    <div class="flex items-center gap-3">
+      <label for="speed-slider" class="font-semibold text-gray-700">波の速さ:</label>
+      <input type="range" id="speed-slider" min="1" max="10" value="5" step="1" class="w-32 cursor-pointer">
+      <span id="speed-val" class="font-mono text-lg w-8 text-right bg-gray-50 px-2 rounded">5</span>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <label for="dt-slider" class="font-semibold text-gray-700">微小時間 Δt:</label>
+      <input type="range" id="dt-slider" min="0" max="10" value="10" step="0.5" class="w-48 cursor-pointer">
+      <span id="dt-val" class="font-mono text-lg w-12 text-right bg-gray-50 px-2 rounded">10.0</span>
+    </div>
+  </div>
+
+  <script>
+    // --- p5.js スケッチ ---
+    
+    // 【パフォーマンス最適化】 不変のパラメータは draw() の外で定数として宣言
+    const A = 60;               // 振幅（ピクセル）
+    const lambda = 320;         // 波長（ピクセル）
+    const k = (2 * Math.PI) / lambda; // 波数
+    const grid_size = 40;       // 方眼のサイズ
+    const v_scale = 10;         // 速度グラフの表示倍率
+    
+    // グラフの基準位置（固定値）
+    const y_top = 240;          // 上段（変位）の原点y座標
+    const y_bottom = 560;       // 下段（速度）の原点y座標
+    const y_axis_x = 80;        // 共通のy軸のx座標
+
+    // 状態変数
+    let current_phase = 0;
+    let isPlaying = false;
+    
+    // DOM要素の参照キャッシュ
+    let dtSlider, speedSlider, playBtn, slowSwitch;
+    let dtValSpan, speedValSpan;
+
+    function setup() {
+      // フレームレートを適正値に固定（過剰な再描画を防ぐ）
+      frameRate(60);
+      
+      let canvas = createCanvas(800, 700);
+      canvas.parent('canvas-container');
+
+      // DOM要素の取得
+      dtSlider = select('#dt-slider');
+      speedSlider = select('#speed-slider');
+      playBtn = select('#play-btn');
+      slowSwitch = select('#slow-switch');
+      dtValSpan = select('#dt-val');
+      speedValSpan = select('#speed-val');
+
+      // 再生ボタンのイベント
+      playBtn.mousePressed(() => {
+        isPlaying = !isPlaying;
+        // セキュリティ：textContentによる安全なテキスト変更
+        playBtn.elt.textContent = isPlaying ? '一時停止' : '再生';
+        if(isPlaying) {
+          playBtn.removeClass('bg-blue-600').removeClass('hover:bg-blue-700').addClass('bg-red-500').addClass('hover:bg-red-600');
+        } else {
+          playBtn.removeClass('bg-red-500').removeClass('hover:bg-red-600').addClass('bg-blue-600').addClass('hover:bg-blue-700');
+        }
+      });
+    }
+
+    function draw() {
+      background(255);
+      
+      // 値の取得と表示更新
+      let dt = float(dtSlider.value());
+      // 【セキュリティ・パフォーマンス】 html() ではなく elt.textContent を使用してDOMを安全・軽量に更新
+      dtValSpan.elt.textContent = dt.toFixed(1);
+
+      let speed_val = float(speedSlider.value());
+      speedValSpan.elt.textContent = speed_val.toString();
+      let omega = speed_val * 0.01;
+
+      // ゼロ除算を防ぐための極小値
+      let dt_calc = dt === 0 ? 0.0001 : dt;
+
+      // アニメーションの進行
+      if (isPlaying) {
+        let isSlow = slowSwitch.elt.checked;
+        let timeStep = isSlow ? 0.05 : 0.5; // スロー時は進行速度を1/10に
+        current_phase += omega * timeStep;
+      }
+
+      drawGrid(y_top, y_bottom, y_axis_x);
+
+      // 【パフォーマンス最適化】 ループ内で共通して使われる計算結果を事前計算しておく
+      let phase_shift = omega * dt;
+      let phase_shift_calc = omega * dt_calc;
+      let phase_current = current_phase;
+      let phase_next = current_phase + phase_shift;
+      let phase_next_calc = current_phase + phase_shift_calc;
+
+      // --------------------------------------------------
+      // 1. 上段グラフ：波形と Δy の矢印
+      // --------------------------------------------------
+      
+      // 時刻 t の波形 y(x, t) （初めの状態：点線）
+      stroke(100);
+      strokeWeight(1.5);
+      drawingContext.setLineDash([5, 5]);
+      noFill();
+      beginShape();
+      for (let x = 0; x <= width; x++) {
+        let y = A * Math.sin(k * x - phase_current);
+        vertex(x, y_top - y);
+      }
+      endShape();
+
+      // 時刻 t + Δt の波形 y(x, t+Δt) （後の状態：実線）
+      stroke(0);
+      strokeWeight(2);
+      drawingContext.setLineDash([]); // 点線リセット
+      beginShape();
+      for (let x = 0; x <= width; x++) {
+        let y = A * Math.sin(k * x - phase_next);
+        vertex(x, y_top - y);
+      }
+      endShape();
+
+      // 方眼の交点ごとに Δy の矢印を描画
+      for (let x = y_axis_x; x < width; x += grid_size) {
+        let y1 = A * Math.sin(k * x - phase_current);
+        let y2 = A * Math.sin(k * x - phase_next);
+        
+        // Δyの矢印（緑色）
+        stroke(0, 160, 40);
+        fill(0, 160, 40);
+        drawArrow(x, y_top - y1, x, y_top - y2);
+      }
+
+      // --------------------------------------------------
+      // 2. 下段グラフ：平均速度 Δy / Δt の矢印と包絡線
+      // --------------------------------------------------
+      
+      // 平均速度の包絡線（点線）
+      stroke(0, 100, 200);
+      strokeWeight(1.5);
+      noFill();
+      drawingContext.setLineDash([5, 5]);
+      beginShape();
+      for (let x = 0; x <= width; x++) {
+        let y1 = A * Math.sin(k * x - phase_current);
+        let y2_calc = A * Math.sin(k * x - phase_next_calc);
+        let dy_calc = y2_calc - y1;
+        let v = dy_calc / dt_calc;
+        vertex(x, y_bottom - v * v_scale);
+      }
+      endShape();
+      drawingContext.setLineDash([]);
+
+      // 方眼の交点ごとに Δy / Δt の矢印を描画
+      for (let x = y_axis_x; x < width; x += grid_size) {
+        let y1 = A * Math.sin(k * x - phase_current);
+        let y2_calc = A * Math.sin(k * x - phase_next_calc);
+        let dy_calc = y2_calc - y1;
+        let v = dy_calc / dt_calc;
+
+        // 速度の矢印（青色）
+        stroke(0, 100, 200);
+        fill(0, 100, 200);
+        drawArrow(x, y_bottom, x, y_bottom - v * v_scale);
+      }
+
+      // ラベルと注釈の描画
+      drawLabels(y_top, y_bottom, y_axis_x);
+    }
+
+    // 矢印を描画するヘルパー関数
+    function drawArrow(x0, y0, x1, y1) {
+      if (dist(x0, y0, x1, y1) < 1) return; 
+
+      strokeWeight(2);
+      line(x0, y0, x1, y1);
+      
+      let angle = Math.atan2(y1 - y0, x1 - x0);
+      let arrowSize = 7;
+      
+      push();
+      translate(x1, y1);
+      rotate(angle);
+      triangle(0, 0, -arrowSize, arrowSize * 0.6, -arrowSize, -arrowSize * 0.6);
+      pop();
+    }
+
+    // 背景の方眼紙と軸を描画する関数
+    function drawGrid(y_top, y_bottom, y_axis_x) {
+      stroke(220);
+      strokeWeight(1);
+      
+      for (let x = 0; x < width; x += grid_size) {
+        line(x, 0, x, height);
+      }
+      for (let y = 0; y < height; y += grid_size) {
+        line(0, y, width, y);
+      }
+
+      stroke(0);
+      strokeWeight(2);
+      
+      line(0, y_top, width, y_top);
+      line(0, y_bottom, width, y_bottom);
+      
+      line(y_axis_x, y_top - 100, y_axis_x, y_top + 100);
+      line(y_axis_x, y_bottom - 100, y_axis_x, y_bottom + 100);
+
+      strokeWeight(2);
+      drawArrow(width - 20, y_top, width, y_top);                 
+      drawArrow(y_axis_x, y_top - 80, y_axis_x, y_top - 100);     
+      drawArrow(width - 20, y_bottom, width, y_bottom);           
+      drawArrow(y_axis_x, y_bottom - 80, y_axis_x, y_bottom - 100); 
+    }
+
+    // 文字ラベルを描画する関数
+    function drawLabels(y_top, y_bottom, y_axis_x) {
+      fill(0);
+      noStroke();
+      textFont('sans-serif');
+      
+      textSize(20);
+      textAlign(CENTER, BOTTOM);
+      text("y", y_axis_x, y_top - 105);
+      textAlign(LEFT, BASELINE);
+      text("x", width - 20, y_top + 25);
+      
+      textSize(16);
+      fill(0);
+      text("y(x, t + Δt)", width - 120, y_top - A - 20);
+      fill(100);
+      text("y(x, t)", width - 120, y_top - A);
+
+      textSize(20);
+      fill(0);
+      textAlign(CENTER, BOTTOM);
+      text("Δy / Δt", y_axis_x, y_bottom - 105);
+      textAlign(LEFT, BASELINE);
+      text("x", width - 20, y_bottom + 25);
+
+      textSize(14);
+      fill(0, 160, 40);
+      text("緑矢印: 変位の差 Δy", y_axis_x + 15, 30);
+      fill(0, 100, 200);
+      text("青矢印: 平均速度 Δy/Δt", y_axis_x + 15, 50);
+    }
+  </script>
+</body>
+</html>
