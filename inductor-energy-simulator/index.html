@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>インダクタの磁気エネルギーシミュレーター</title>
+    
+    <!-- 
+      【セキュリティ配慮: CSP (Content Security Policy)】
+      本番環境 (GitHub Pages) でセキュリティを強化する場合は、以下のコメントアウトを解除してください。
+      外部からの不正なスクリプト読み込みなどを制限します。
+    -->
+    <!-- <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; font-src 'self' https://cdn.jsdelivr.net; img-src 'self' data:;"> -->
+
+    <!-- Tailwind CSS (開発用CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- p5.js library (縮小版・SRI付き) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js" xintegrity="sha512-uGmpj8O064/A8ms28/DkE0mO2YIfSdm//iWe9rPoa1X50K7522KieAyaE2pylnwe/fQzQ9HhwHrtT//4H1xY8Q==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    
+    <!-- MathJax for rendering equations -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <style>
+        /* カスタムスライダースタイル */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #ef4444;
+            cursor: pointer;
+            margin-top: -6px;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen p-2 md:p-4">
+
+    <div class="max-w-6xl mx-auto space-y-3">
+        
+        <!-- ヘッダー -->
+        <header class="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-200">
+            <h1 class="text-xl md:text-2xl font-bold text-slate-800 mb-1">インダクタに蓄えられる磁気エネルギー</h1>
+            <p class="text-sm text-slate-600">
+                グラフの短冊（長方形）は、微小時間にコイルに逆らってする仕事 \(\Delta W = Li \Delta i\) を表しています。<br>
+                分割数 \(N\) を大きくし \(\Delta i \to 0\) とすることで、長方形の面積の和（区分求積）が三角形の面積（定積分）に近づく様子を確認できます。
+            </p>
+        </header>
+
+        <!-- メインコンテンツ -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- キャンバスコンテナ (左側) -->
+            <div class="bg-white p-2 md:p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center">
+                <div id="canvas-container" class="w-full flex justify-center"></div>
+                <p class="mt-2 text-xs text-slate-500">※ グラフ上の赤い直線は \(y = L \cdot i\) を表しています。</p>
+            </div>
+
+            <!-- コントロールパネル (右側) -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-center space-y-4">
+                
+                <!-- スライダー群 -->
+                <div class="space-y-3">
+                    <!-- インダクタンス L -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="font-medium text-slate-700" for="slider-L">インダクタンス \(L\) [H]</label>
+                            <span id="val-L" class="font-semibold text-red-500">2.0</span>
+                        </div>
+                        <input type="range" id="slider-L" min="0.1" max="5.0" step="0.1" value="2.0" aria-label="インダクタンス L">
+                    </div>
+                    
+                    <!-- 最大電流 I -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="font-medium text-slate-700" for="slider-I">最大電流 \(I\) [A]</label>
+                            <span id="val-I" class="font-semibold text-blue-500">5.0</span>
+                        </div>
+                        <input type="range" id="slider-I" min="1.0" max="10.0" step="0.1" value="5.0" aria-label="最大電流 I">
+                    </div>
+
+                    <!-- 分割数 N -->
+                    <div>
+                        <div class="flex justify-between mb-1">
+                            <label class="font-medium text-slate-700" for="slider-N">分割数 \(N\)</label>
+                            <span id="val-N" class="font-semibold text-emerald-500">5</span>
+                        </div>
+                        <input type="range" id="slider-N" min="1" max="100" step="1" value="5" aria-label="分割数 N">
+                    </div>
+                </div>
+
+                <hr class="border-slate-200">
+
+                <!-- 計算結果表示 -->
+                <div class="space-y-2">
+                    <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                        <div class="text-xs text-slate-500 mb-1">長方形の面積の和 (区分求積)</div>
+                        <div class="text-base overflow-x-auto whitespace-nowrap" aria-live="polite">
+                            \( W_{N} = \sum_{k=1}^{N} L i_k \Delta i = \) 
+                            <span id="calc-approx" class="font-bold text-slate-800 text-lg ml-1">--</span> [J]
+                        </div>
+                    </div>
+
+                    <div class="bg-red-50 p-3 rounded-lg border border-red-100">
+                        <div class="text-xs text-red-400 mb-1">実際のエネルギー (定積分・三角形の面積)</div>
+                        <div class="text-base overflow-x-auto whitespace-nowrap" aria-live="polite">
+                            \( W = \int_{0}^{I} L i \, di = \frac{1}{2} L I^2 = \) 
+                            <span id="calc-exact" class="font-bold text-red-600 text-lg ml-1">--</span> [J]
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- シミュレーションロジック (p5.js) -->
+    <script>
+        // DOMの読み込みが完了してから実行し、グローバルスコープの汚染を防ぐ
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            // UI要素の取得
+            const sliderL = document.getElementById('slider-L');
+            const sliderI = document.getElementById('slider-I');
+            const sliderN = document.getElementById('slider-N');
+            const valL = document.getElementById('val-L');
+            const valI = document.getElementById('val-I');
+            const valN = document.getElementById('val-N');
+            const calcApprox = document.getElementById('calc-approx');
+            const calcExact = document.getElementById('calc-exact');
+
+            // シミュレーションの状態を保持するオブジェクト
+            const state = {
+                L: parseFloat(sliderL.value),
+                I: parseFloat(sliderI.value),
+                N: parseInt(sliderN.value, 10),
+                maxDrawI: 11,
+                maxDrawLi: 55
+            };
+
+            // UIの値を更新する関数
+            const updateValues = () => {
+                // セキュリティ配慮: 数値にパースすることで意図しない文字（スクリプト等）を排除
+                state.L = parseFloat(sliderL.value);
+                state.I = parseFloat(sliderI.value);
+                state.N = parseInt(sliderN.value, 10);
+
+                // UIのテキスト更新 (textContent を使用し XSS を防ぐ)
+                valL.textContent = state.L.toFixed(1);
+                valI.textContent = state.I.toFixed(1);
+                valN.textContent = state.N;
+
+                // 定積分 (実際のエネルギー) W = 1/2 * L * I^2
+                const exactEnergy = 0.5 * state.L * state.I * state.I;
+                calcExact.textContent = exactEnergy.toFixed(2);
+
+                // 区分求積 (長方形の面積の和) Right Riemann Sum
+                let approxEnergy = 0;
+                const delta_i = state.I / state.N;
+                for (let k = 1; k <= state.N; k++) {
+                    let current_i = k * delta_i;
+                    let height = state.L * current_i;
+                    approxEnergy += height * delta_i;
+                }
+                calcApprox.textContent = approxEnergy.toFixed(2);
+            };
+
+            // イベントリスナーの設定
+            sliderL.addEventListener('input', updateValues);
+            sliderI.addEventListener('input', updateValues);
+            sliderN.addEventListener('input', updateValues);
+
+            // p5.jsのスケッチ定義 (インスタンスモード)
+            const sketch = (p) => {
+                const layout = {
+                    paddingLeft: 60,
+                    paddingBottom: 50,
+                    paddingTop: 30,
+                    paddingRight: 30
+                };
+                
+                p.setup = () => {
+                    let container = document.getElementById('canvas-container');
+                    let canvasWidth = Math.min(container.offsetWidth, 500);
+                    let canvas = p.createCanvas(canvasWidth, canvasWidth);
+                    canvas.parent('canvas-container');
+                    p.textFont('sans-serif');
+                    updateValues();
+                };
+
+                p.windowResized = () => {
+                    let container = document.getElementById('canvas-container');
+                    if (container) {
+                        let canvasWidth = Math.min(container.offsetWidth, 500);
+                        p.resizeCanvas(canvasWidth, canvasWidth);
+                    }
+                };
+
+                // 座標変換ヘルパー関数
+                const mapX = (val) => p.map(val, 0, state.maxDrawI, layout.paddingLeft, p.width - layout.paddingRight);
+                const mapY = (val) => p.map(val, 0, state.maxDrawLi, p.height - layout.paddingBottom, layout.paddingTop);
+
+                p.draw = () => {
+                    p.background(255);
+
+                    // --- 軸の描画 ---
+                    p.stroke(100);
+                    p.strokeWeight(1.5);
+                    p.fill(100);
+                    
+                    let originX = mapX(0);
+                    let originY = mapY(0);
+
+                    // X軸と矢印
+                    p.line(originX, originY, p.width - 20, originY);
+                    p.triangle(p.width - 20, originY - 4, p.width - 20, originY + 4, p.width - 12, originY);
+                    
+                    // Y軸と矢印
+                    p.line(originX, originY, originX, 20);
+                    p.triangle(originX - 4, 20, originX + 4, 20, originX, 12);
+
+                    // ラベル (O, i, Li)
+                    p.noStroke();
+                    p.textSize(16);
+                    p.textAlign(p.CENTER, p.CENTER);
+                    p.text("O", originX - 15, originY + 15);
+                    
+                    p.textAlign(p.LEFT, p.CENTER);
+                    p.text("i [A]", p.width - 40, originY + 25);
+                    
+                    p.textAlign(p.CENTER, p.BOTTOM);
+                    p.text("Li [Wb]", originX, 15);
+
+
+                    // --- 短冊 (長方形) の描画 ---
+                    let delta_i = state.I / state.N;
+                    p.stroke(200, 100, 100);
+                    p.strokeWeight(1);
+                    
+                    for (let k = 1; k <= state.N; k++) {
+                        let i_prev = (k - 1) * delta_i;
+                        let i_curr = k * delta_i;
+                        let heightVal = state.L * i_curr;
+
+                        let x1 = mapX(i_prev);
+                        let x2 = mapX(i_curr);
+                        let yRect = mapY(heightVal);
+
+                        if (k === Math.ceil(state.N / 2)) {
+                            p.fill(244, 114, 182, 180); // 強調
+                        } else {
+                            p.fill(253, 164, 175, 120); // 通常
+                        }
+                        p.rect(x1, yRect, x2 - x1, originY - yRect);
+                    }
+
+                    // --- 強調表示した短冊のラベル ---
+                    if (state.N <= 20) {
+                        let k_mid = Math.ceil(state.N / 2);
+                        let i_prev = (k_mid - 1) * delta_i;
+                        let i_curr = k_mid * delta_i;
+                        let h_mid = state.L * i_curr;
+                        
+                        let x1 = mapX(i_prev);
+                        let x2 = mapX(i_curr);
+                        let yTop = mapY(h_mid);
+
+                        p.fill(0);
+                        p.noStroke();
+                        p.textSize(12);
+                        p.textAlign(p.CENTER, p.BOTTOM);
+                        
+                        if (x2 - x1 > 20) {
+                            p.text("Δi", (x1 + x2) / 2, yTop - 5);
+                            p.stroke(100);
+                            p.strokeWeight(1);
+                            p.line(x1, yTop - 3, x1, yTop - 15);
+                            p.line(x2, yTop - 3, x2, yTop - 15);
+                            p.line(x1, yTop - 10, x2, yTop - 10);
+                        }
+                    }
+
+                    // --- グラフの線 (y = L * x) の描画 ---
+                    p.stroke(239, 68, 68);
+                    p.strokeWeight(2);
+                    let lineEndX = mapX(state.I);
+                    let lineEndY = mapY(state.L * state.I);
+                    p.line(originX, originY, lineEndX, lineEndY);
+                    
+                    // 延長線（点線）
+                    p.drawingContext.setLineDash([5, 5]);
+                    p.stroke(239, 68, 68, 100);
+                    p.line(lineEndX, lineEndY, mapX(state.maxDrawI), mapY(state.L * state.maxDrawI));
+                    p.drawingContext.setLineDash([]);
+
+
+                    // --- 目盛りと補助線の描画 ---
+                    p.stroke(150);
+                    p.drawingContext.setLineDash([3, 3]);
+                    
+                    p.line(lineEndX, originY, lineEndX, lineEndY);
+                    p.line(originX, lineEndY, lineEndX, lineEndY);
+                    
+                    p.drawingContext.setLineDash([]);
+                    p.noStroke();
+                    p.fill(0);
+                    p.textSize(14);
+                    
+                    p.textAlign(p.CENTER, p.TOP);
+                    p.text("I", lineEndX, originY + 8);
+                    
+                    p.textAlign(p.RIGHT, p.CENTER);
+                    p.text("L I", originX - 8, lineEndY);
+
+                    p.fill(239, 68, 68);
+                    p.circle(lineEndX, lineEndY, 8);
+                };
+            };
+
+            // p5のインスタンスを作成
+            new p5(sketch);
+            
+            // 初期化実行
+            updateValues();
+
+        });
+    </script>
+</body>
+</html>
