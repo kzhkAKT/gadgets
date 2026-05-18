@@ -18,4 +18,5 @@ Javascript Gadgets Data Repository
 1. https://kzhkakt.github.io/gadgets/understand-average-velocity
 1. https://kzhkakt.github.io/gadgets/medium-dy-dydt
 1. https://kzhkakt.github.io/gadgets/medium-dv-dvdt
-1. https://kzhkakt.github.io/gadgets/inductor-energy-simulator 
+1. https://kzhkakt.github.io/gadgets/inductor-energy-simulator
+1. https://kzhkakt.github.io/gadgets/curve-torsion-simulator
