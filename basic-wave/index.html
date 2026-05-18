@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>波の基本式シミュレーター</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- p5.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <style>
+        input[type=range] {
+            accent-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 md:p-8 font-sans text-gray-800">
+
+    <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-4xl">
+        
+        <!-- タイトル -->
+        <h1 class="text-2xl md:text-3xl font-bold mb-6 text-center text-blue-900">
+            波の基本式 v = fλ シミュレーター
+        </h1>
+        
+        <!-- 計算結果 -->
+        <div class="grid grid-cols-2 gap-4 mb-6 text-center">
+            <div class="p-4 bg-blue-50 border border-blue-100 rounded-lg shadow-sm">
+                <p class="text-sm font-semibold text-gray-600 mb-1">波の速さ <span class="text-lg">v</span> (v = f × λ)</p>
+                <p class="text-3xl font-bold text-blue-600"><span id="val-v">0.0</span> <span class="text-base font-normal text-blue-400">px/s</span></p>
+            </div>
+            <div class="p-4 bg-green-50 border border-green-100 rounded-lg shadow-sm">
+                <p class="text-sm font-semibold text-gray-600 mb-1">周期 <span class="text-lg">T</span> (T = 1 / f)</p>
+                <p class="text-3xl font-bold text-green-600"><span id="val-t">0.0</span> <span class="text-base font-normal text-green-400">s</span></p>
+            </div>
+        </div>
+
+        <!-- スライダー群 -->
+        <div class="mb-6 space-y-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <div>
+                <label class="flex justify-between text-sm font-bold text-gray-700 mb-2">
+                    <span>振動数 f (Hz) ： 1秒間に波が揺れる回数</span>
+                    <span id="label-f" class="text-blue-600 text-lg">1.0</span>
+                </label>
+                <input type="range" id="slider-f" min="0.2" max="3.0" step="0.1" value="1.0" class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer">
+            </div>
+            <div>
+                <label class="flex justify-between text-sm font-bold text-gray-700 mb-2">
+                    <span>波長 λ (px) ： 波1個分の長さ</span>
+                    <span id="label-lambda" class="text-blue-600 text-lg">200</span>
+                </label>
+                <input type="range" id="slider-lambda" min="100" max="400" step="10" value="200" class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer">
+            </div>
+            <div>
+                <label class="flex justify-between text-sm font-bold text-gray-700 mb-2">
+                    <span>測定位置の平行移動 ： 測る場所を左右にずらす</span>
+                    <span id="label-x" class="text-blue-600 text-lg">80</span>
+                </label>
+                <input type="range" id="slider-x" min="0" max="800" step="5" value="80" class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer">
+            </div>
+        </div>
+
+        <!-- キャンバス -->
+        <div id="canvas-container" class="w-full flex justify-center border border-gray-300 rounded-lg overflow-hidden bg-white shadow-inner mb-4">
+        </div>
+        
+        <!-- 凡例 -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded text-sm text-gray-700 leading-relaxed">
+            <p class="font-bold mb-2">【観察のポイント】</p>
+            <ul class="list-disc pl-5 space-y-1">
+                <li><span class="text-red-500 font-bold">● 赤い点（始点）</span>： 媒質の一部です。波は右に進みますが、<strong>点は上下にしか動かない</strong>ことに注目してください。</li>
+                <li><span class="text-blue-400 font-bold">● 青い点（終点）</span>： 赤い点から <strong>1波長（λ）</strong> 分だけ離れた場所です。赤い点と全く同じタイミングで上下に動きます。</li>
+                <li><strong>測定位置の平行移動</strong>スライダーを使うと、測る基準となる場所を左右に動かせます。どの場所で測っても波長や周期のルールは同じです。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const sliderF = document.getElementById('slider-f');
+        const sliderLambda = document.getElementById('slider-lambda');
+        const sliderX = document.getElementById('slider-x');
+        const labelF = document.getElementById('label-f');
+        const labelLambda = document.getElementById('label-lambda');
+        const labelX = document.getElementById('label-x');
+        const valV = document.getElementById('val-v');
+        const valT = document.getElementById('val-t');
+
+        let phase = 0;
+        let amplitude = 60; 
+
+        function setup() {
+            const container = document.getElementById('canvas-container');
+            let canvas = createCanvas(container.clientWidth, 260);
+            canvas.parent('canvas-container');
+            sliderX.max = container.clientWidth - 50;
+        }
+
+        function draw() {
+            background(255); 
+            
+            let f = parseFloat(sliderF.value);
+            let lambda = parseFloat(sliderLambda.value);
+            let startX = parseFloat(sliderX.value);
+            
+            labelF.innerText = f.toFixed(1);
+            labelLambda.innerText = lambda.toFixed(0);
+            labelX.innerText = startX.toFixed(0);
+            
+            let velocity = f * lambda; 
+            let period = 1.0 / f;      
+            
+            valV.innerText = velocity.toFixed(1);
+            valT.innerText = period.toFixed(2);
+
+            let dt = deltaTime / 1000.0;
+            phase += TWO_PI * f * dt;
+            
+            let k = TWO_PI / lambda;
+
+            // 中心線
+            stroke(220);
+            strokeWeight(2);
+            line(0, height/2, width, height/2);
+
+            // 波
+            noFill();
+            stroke(40, 120, 220); 
+            strokeWeight(3);
+            beginShape();
+            for (let x = 0; x <= width + 50; x += 2) {
+                let y = height/2 + amplitude * sin(k * x - phase);
+                vertex(x, y);
+            }
+            endShape();
+
+            // 点の座標計算
+            let startY = height/2 + amplitude * sin(k * startX - phase);
+            let endX = startX + lambda;
+            let endY = height/2 + amplitude * sin(k * endX - phase);
+
+            // ガイド線
+            let guideY = height/2 - amplitude - 30; 
+            drawingContext.setLineDash([5, 5]);
+            stroke(150);
+            strokeWeight(2);
+            line(startX, guideY, endX, guideY);
+            line(startX, guideY - 10, startX, height/2);
+            line(endX, guideY - 10, endX, height/2);
+            drawingContext.setLineDash([]); 
+
+            // ラベル
+            fill(100);
+            noStroke();
+            textSize(18);
+            textAlign(CENTER, BOTTOM);
+            text("波長 λ", (startX + endX) / 2, guideY - 5);
+
+            // 赤い点
+            fill(239, 68, 68); 
+            noStroke();
+            circle(startX, startY, 18);
+            
+            // 青い点 (透過)
+            fill(59, 130, 246, 150); 
+            noStroke();
+            circle(endX, endY, 18);
+        }
+        
+        function windowResized() {
+            const container = document.getElementById('canvas-container');
+            resizeCanvas(container.clientWidth, 260);
+            sliderX.max = container.clientWidth - 50;
+        }
+    </script>
+</body>
+</html>

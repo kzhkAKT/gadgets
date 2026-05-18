@@ -20,3 +20,4 @@ Javascript Gadgets Data Repository
 1. https://kzhkakt.github.io/gadgets/medium-dv-dvdt
 1. https://kzhkakt.github.io/gadgets/inductor-energy-simulator
 1. https://kzhkakt.github.io/gadgets/curve-torsion-simulator
+1. https://kzhkakt.github.io/gadgets/basic-wave
