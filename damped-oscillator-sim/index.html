@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>減衰振動シミュレーション</title>
+    <!-- 依存ライブラリの読み込み (HTTPS経由) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* キャンバスが親要素からはみ出ないようにするためのレスポンシブ対応 */
+        canvas {
+            max-width: 100%;
+            height: auto !important;
+        }
+        /* スライダーのスタイリング微調整 */
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans p-4 md:p-8 min-h-screen flex items-center justify-center">
+
+    <div class="max-w-6xl w-full bg-white rounded-xl shadow-xl overflow-hidden flex flex-col md:flex-row">
+        
+        <!-- コントロールパネル (左側) -->
+        <div class="w-full md:w-1/3 p-6 bg-gray-50 border-r border-gray-200 flex flex-col gap-5 overflow-y-auto" style="max-height: 600px;">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">減衰振動シミュレーション</h1>
+                <p class="text-sm text-gray-500 mt-1">3つの減衰レジームの厳密解を比較</p>
+            </div>
+            
+            <div class="space-y-4 mt-2">
+                <!-- 初期位置 x0 -->
+                <div>
+                    <label class="flex justify-between text-sm font-semibold text-gray-700">
+                        <span>初期位置 x₀</span>
+                        <span id="val-x0" class="text-blue-600 font-mono">1.0</span>
+                    </label>
+                    <input type="range" id="x0" min="-5.0" max="5.0" step="0.1" value="1.0" class="mt-1">
+                </div>
+
+                <!-- 初速度 v0 -->
+                <div>
+                    <label class="flex justify-between text-sm font-semibold text-gray-700">
+                        <span>初速度 v₀</span>
+                        <span id="val-v0" class="text-blue-600 font-mono">0.0</span>
+                    </label>
+                    <input type="range" id="v0" min="-10.0" max="10.0" step="0.1" value="0.0" class="mt-1">
+                </div>
+
+                <!-- 固有角振動数 w0 -->
+                <div>
+                    <label class="flex justify-between text-sm font-semibold text-gray-700">
+                        <span>固有角振動数 ω₀</span>
+                        <span id="val-w0" class="text-blue-600 font-mono">1.0</span>
+                    </label>
+                    <input type="range" id="w0" min="0.1" max="5.0" step="0.1" value="1.0" class="mt-1">
+                </div>
+
+                <hr class="border-gray-300">
+
+                <!-- 不足減衰の減衰比 zeta_under -->
+                <div>
+                    <label class="flex justify-between text-sm font-semibold text-blue-700">
+                        <span>不足減衰比 ζ (ζ < 1)</span>
+                        <span id="val-zetaUnder" class="font-mono">0.20</span>
+                    </label>
+                    <input type="range" id="zetaUnder" min="0.01" max="0.99" step="0.01" value="0.2" class="mt-1 accent-blue-600">
+                </div>
+
+                <!-- 過減衰の減衰比 zeta_over -->
+                <div>
+                    <label class="flex justify-between text-sm font-semibold text-red-700">
+                        <span>過減衰比 ζ (ζ > 1)</span>
+                        <span id="val-zetaOver" class="font-mono">2.00</span>
+                    </label>
+                    <input type="range" id="zetaOver" min="1.01" max="5.00" step="0.01" value="2.0" class="mt-1 accent-red-600">
+                </div>
+            </div>
+            
+            <div class="mt-auto pt-4 text-xs text-gray-400">
+                ※ スライダーを動かすとグラフが即座に再描画されます。
+            </div>
+        </div>
+
+        <!-- グラフ描画エリア (右側) -->
+        <div class="w-full md:w-2/3 p-4 flex items-center justify-center bg-white relative">
+            <div id="canvas-container" class="border border-gray-200 rounded-lg shadow-inner overflow-hidden"></div>
+        </div>
+    </div>
+
+    <!-- p5.js ロジック -->
+    <script>
+        // インスタンスモードで記述し、グローバル空間を保護
+        const sketch = (p) => {
+            const CANVAS_W = 750;
+            const CANVAS_H = 600;
+            
+            // 描画範囲の定義
+            const tMax = 15;
+            const yMax = 6; // y軸の表示範囲 [-6, 6]
+
+            // 座標変換関数
+            const mapX = (t) => p.map(t, 0, tMax, 60, CANVAS_W - 30);
+            const mapY = (x) => p.map(x, yMax, -yMax, 30, CANVAS_H - 40);
+
+            p.setup = () => {
+                let canvas = p.createCanvas(CANVAS_W, CANVAS_H);
+                canvas.parent('canvas-container');
+                p.noLoop(); // アニメーションではなくイベント駆動で描画
+
+                // UIイベントのバインド
+                const inputs = ['x0', 'v0', 'w0', 'zetaUnder', 'zetaOver'];
+                inputs.forEach(id => {
+                    const element = document.getElementById(id);
+                    const valElement = document.getElementById(`val-${id}`);
+                    
+                    element.addEventListener('input', (e) => {
+                        // XSS対策としてtextContentを使用し、数値をフォーマット
+                        let val = parseFloat(e.target.value);
+                        valElement.textContent = val.toFixed(id.includes('zeta') ? 2 : 1);
+                        p.redraw(); // 値が変更されたら再描画
+                    });
+                });
+            };
+
+            p.draw = () => {
+                p.background(255);
+
+                // パラメータの安全な取得
+                const x0 = parseFloat(document.getElementById('x0').value);
+                const v0 = parseFloat(document.getElementById('v0').value);
+                const w0 = parseFloat(document.getElementById('w0').value);
+                const zUnder = parseFloat(document.getElementById('zetaUnder').value);
+                const zOver = parseFloat(document.getElementById('zetaOver').value);
+
+                drawAxes();
+                drawLegends();
+
+                // 計算ステップ幅
+                const dt = 0.05;
+
+                // --- 1. 不足減衰 (Underdamped) - 青 ---
+                p.stroke(37, 99, 235); // Tailwind blue-600
+                p.strokeWeight(2.5);
+                p.noFill();
+                p.beginShape();
+                for (let t = 0; t <= tMax; t += dt) {
+                    let wd = w0 * Math.sqrt(1 - zUnder * zUnder);
+                    let x = Math.exp(-zUnder * w0 * t) * (x0 * Math.cos(wd * t) + (v0 + zUnder * w0 * x0) / wd * Math.sin(wd * t));
+                    p.vertex(mapX(t), mapY(x));
+                }
+                p.endShape();
+
+                // --- 2. 臨界減衰 (Critically Damped) - 緑 ---
+                p.stroke(22, 163, 74); // Tailwind green-600
+                p.strokeWeight(2.5);
+                p.beginShape();
+                for (let t = 0; t <= tMax; t += dt) {
+                    let x = Math.exp(-w0 * t) * (x0 + (v0 + w0 * x0) * t);
+                    p.vertex(mapX(t), mapY(x));
+                }
+                p.endShape();
+
+                // --- 3. 過減衰 (Overdamped) - 赤 ---
+                p.stroke(220, 38, 38); // Tailwind red-600
+                p.strokeWeight(2.5);
+                p.beginShape();
+                for (let t = 0; t <= tMax; t += dt) {
+                    let eta = w0 * Math.sqrt(zOver * zOver - 1);
+                    let x = Math.exp(-zOver * w0 * t) * (x0 * Math.cosh(eta * t) + (v0 + zOver * w0 * x0) / eta * Math.sinh(eta * t));
+                    p.vertex(mapX(t), mapY(x));
+                }
+                p.endShape();
+            };
+
+            // 軸とグリッドの描画
+            function drawAxes() {
+                p.stroke(220);
+                p.strokeWeight(1);
+                
+                // 水平グリッド線とラベル
+                p.textAlign(p.RIGHT, p.CENTER);
+                p.textSize(12);
+                for (let y = -yMax; y <= yMax; y++) {
+                    let py = mapY(y);
+                    if (y === 0) {
+                        p.stroke(150); // 中心線は濃く
+                    } else {
+                        p.stroke(240);
+                    }
+                    p.line(mapX(0), py, mapX(tMax), py);
+                    
+                    p.noStroke();
+                    p.fill(100);
+                    p.text(y, mapX(0) - 10, py);
+                }
+
+                // 垂直グリッド線とラベル
+                p.textAlign(p.CENTER, p.TOP);
+                for (let t = 0; t <= tMax; t += 1) {
+                    let px = mapX(t);
+                    p.stroke(240);
+                    p.line(px, mapY(yMax), px, mapY(-yMax));
+                    
+                    if (t % 5 === 0) {
+                        p.noStroke();
+                        p.fill(100);
+                        p.text(t, px, mapY(-yMax) + 10);
+                    }
+                }
+
+                // 軸タイトル
+                p.fill(50);
+                p.textAlign(p.RIGHT, p.BOTTOM);
+                p.text("時間 t", CANVAS_W - 10, mapY(0) - 10);
+                p.textAlign(p.LEFT, p.TOP);
+                p.text("変位 x(t)", mapX(0) + 10, 10);
+            }
+
+            // 凡例の描画
+            function drawLegends() {
+                const legendX = CANVAS_W - 170;
+                const legendY = 30;
+                
+                p.noStroke();
+                p.textAlign(p.LEFT, p.CENTER);
+                p.textSize(13);
+
+                // 不足減衰
+                p.fill(37, 99, 235);
+                p.rect(legendX, legendY, 20, 3);
+                p.fill(70);
+                p.text("不足減衰 (ζ < 1)", legendX + 28, legendY + 1);
+
+                // 臨界減衰
+                p.fill(22, 163, 74);
+                p.rect(legendX, legendY + 25, 20, 3);
+                p.fill(70);
+                p.text("臨界減衰 (ζ = 1)", legendX + 28, legendY + 26);
+
+                // 過減衰
+                p.fill(220, 38, 38);
+                p.rect(legendX, legendY + 50, 20, 3);
+                p.fill(70);
+                p.text("過減衰 (ζ > 1)", legendX + 28, legendY + 51);
+            }
+        };
+
+        // スケッチの起動
+        new p5(sketch);
+    </script>
+</body>
+</html>
