@@ -21,4 +21,5 @@ Javascript Gadgets Data Repository
 1. https://kzhkakt.github.io/gadgets/inductor-energy-simulator
 1. https://kzhkakt.github.io/gadgets/curve-torsion-simulator
 1. https://kzhkakt.github.io/gadgets/basic-wave
-2. https://kzhkakt.github.io/gadgets/damped-oscillator-sim/
+1. https://kzhkakt.github.io/gadgets/damped-oscillator-sim/
+2. https://kzhkakt.github.io/gadgets/CDtimer2
