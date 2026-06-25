@@ -168,19 +168,40 @@
                     
                     achievementTargetDisplay.textContent = `到達度試験: ${achYear}年${achMonth}月${achDate}日`;
                     
-                    if (achDiffDays > 0) {
+                    let areaBgClass = "";
+                    let textClass = "";
+
+                    if (achDiffDays > 14) {
                         achievementDaysRemaining.textContent = achDiffDays;
                         achievementMessageDisplay.textContent = '試験に向けて計画的に学習を進めましょう！';
                         achievementDaysRemaining.className = "text-amber-600 text-5xl";
+                        areaBgClass = "bg-amber-50 border-amber-200";
+                        textClass = "text-amber-800";
+                    } else if (achDiffDays > 0 && achDiffDays <= 14) {
+                        achievementDaysRemaining.textContent = achDiffDays;
+                        achievementMessageDisplay.textContent = '試験まで2週間を切りました！ラストスパートです！';
+                        achievementDaysRemaining.className = "text-red-600 text-5xl font-bold";
+                        areaBgClass = "bg-red-50 border-red-200"; // 薄い赤背景
+                        textClass = "text-red-800"; // 濃い赤文字で読みやすく
                     } else if (achDiffDays === 0) {
                         achievementDaysRemaining.textContent = "0";
                         achievementMessageDisplay.textContent = '今日が到達度試験当日です！落ち着いて頑張ってください！';
                         achievementDaysRemaining.className = "text-green-600 text-5xl";
+                        areaBgClass = "bg-green-50 border-green-200";
+                        textClass = "text-green-800";
                     } else {
                         achievementDaysRemaining.textContent = Math.abs(achDiffDays);
                         achievementMessageDisplay.textContent = '試験は終了しました。お疲れ様でした！';
                         achievementDaysRemaining.className = "text-gray-500 text-5xl";
+                        areaBgClass = "bg-gray-50 border-gray-200";
+                        textClass = "text-gray-600";
                     }
+
+                    // 背景色と文字色を動的に適用
+                    achievementTargetDisplay.className = `text-sm mb-1 ${textClass}`;
+                    achievementMessageDisplay.className = `text-sm ${textClass}`;
+                    achievementResultArea.className = `p-4 border rounded-md text-center ${areaBgClass}`;
+                    
                     achievementResultArea.classList.remove('hidden');
                 }
 
