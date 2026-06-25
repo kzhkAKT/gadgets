@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高専生向け 決戦の日までのカウントダウン</title>
+    <!-- Tailwind CSSを使用してデザインを整えます -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* カスタムフォントや微調整が必要な場合はここに追記 */
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-md w-full bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="bg-blue-600 p-6 text-white text-center">
+            <h1 class="text-2xl font-bold">高専生カウントダウン</h1>
+            <p class="text-sm mt-2 opacity-90">就活・編入準備が本格化する<br>「4年生の3月31日」までの残り日数</p>
+        </div>
+
+        <div class="p-6">
+            <div class="mb-4">
+                <label for="enrollmentYear" class="block text-sm font-medium text-gray-700 mb-1">
+                    入学年度（西暦）を入力してください
+                </label>
+                <input 
+                    type="number" 
+                    id="enrollmentYear" 
+                    placeholder="例: 2024" 
+                    min="1962" 
+                    max="2100"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                >
+            </div>
+
+            <button 
+                id="calculateBtn"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-md transition-colors"
+            >
+                残り日数を計算する
+            </button>
+
+            <!-- エラーメッセージ表示エリア -->
+            <p id="errorMsg" class="text-red-500 text-sm mt-3 text-center hidden"></p>
+
+            <!-- 結果表示エリア -->
+            <div id="resultArea" class="mt-6 p-4 bg-slate-100 rounded-md hidden text-center">
+                <p class="text-gray-600 text-sm mb-1" id="targetDateDisplay"></p>
+                <div class="text-3xl font-bold text-gray-800 my-2">
+                    あと <span id="daysRemaining" class="text-blue-600 text-5xl"></span> 日
+                </div>
+                <p class="text-gray-600 text-sm" id="messageDisplay"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const calculateBtn = document.getElementById('calculateBtn');
+            const enrollmentYearInput = document.getElementById('enrollmentYear');
+            
+            // UIエレメント
+            const errorMsg = document.getElementById('errorMsg');
+            const resultArea = document.getElementById('resultArea');
+            const targetDateDisplay = document.getElementById('targetDateDisplay');
+            const daysRemaining = document.getElementById('daysRemaining');
+            const messageDisplay = document.getElementById('messageDisplay');
+
+            calculateBtn.addEventListener('click', () => {
+                // UIリセット
+                errorMsg.classList.add('hidden');
+                errorMsg.textContent = '';
+                resultArea.classList.add('hidden');
+
+                // 入力値の取得
+                const inputVal = enrollmentYearInput.value;
+                const year = parseInt(inputVal, 10);
+
+                // セキュリティと妥当性の検証 (バリデーション)
+                // - isNaNで数値かチェック
+                // - 高専制度開始(1962年)から未来(2100年)までの範囲に制限
+                if (isNaN(year) || year < 1962 || year > 2100) {
+                    errorMsg.textContent = '有効な入学年度（西暦1962〜2100）を半角数字で入力してください。';
+                    errorMsg.classList.remove('hidden');
+                    return;
+                }
+
+                // 計算ロジック
+                // 入学が Y 年の場合、4年生になるのは Y + 3 年。
+                // その年度末（3月31日）は Y + 4 年の3月31日となる。
+                const targetYear = year + 4;
+                
+                // JavaScriptのDateオブジェクトの「月」は0始まり (0 = 1月, 2 = 3月)
+                // 時間を0時0分0秒にセットして、純粋な日付の差分を計算しやすくする
+                const targetDate = new Date(targetYear, 2, 31, 0, 0, 0, 0); 
+                
+                const today = new Date();
+                // 今日も0時0分0秒に正規化
+                const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+
+                // ミリ秒の差分から日数を計算
+                const diffTime = targetDate.getTime() - todayMidnight.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                // 結果の表示処理 (セキュリティのため必ず textContent を使用)
+                targetDateDisplay.textContent = `目標日: ${targetYear}年3月31日`;
+                
+                if (diffDays > 0) {
+                    daysRemaining.textContent = diffDays;
+                    messageDisplay.textContent = '準備を始めるための決戦の日です！';
+                    daysRemaining.className = "text-blue-600 text-5xl"; // 色を戻す
+                } else if (diffDays === 0) {
+                    daysRemaining.textContent = "0";
+                    messageDisplay.textContent = '今日がまさにその日です！';
+                    daysRemaining.className = "text-green-600 text-5xl";
+                } else {
+                    daysRemaining.textContent = Math.abs(diffDays);
+                    messageDisplay.textContent = '日はすでに過ぎています。今すぐ動き出しましょう！';
+                    daysRemaining.className = "text-red-600 text-5xl";
+                }
+
+                resultArea.classList.remove('hidden');
+            });
+
+            // Enterキーでも計算できるようにする
+            enrollmentYearInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    calculateBtn.click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
