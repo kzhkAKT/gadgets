@@ -71,10 +71,19 @@
                 <!-- 到達度試験までのカウントダウン -->
                 <div id="achievementResultArea" class="p-4 bg-amber-50 border border-amber-200 rounded-md text-center hidden">
                     <p class="text-amber-800 text-sm mb-1" id="achievementTargetDisplay"></p>
-                    <div class="text-3xl font-bold text-gray-800 my-2">
-                        あと <span id="achievementDaysRemaining" class="text-amber-600 text-5xl"></span> 日
+                    <div class="my-3 flex flex-col items-center justify-center">
+                        <div class="flex items-baseline mb-1">
+                            <span class="text-xl font-bold mr-2 text-gray-700">あと</span>
+                            <span id="achievementDaysRemaining" class="text-5xl font-bold tabular-nums"></span>
+                            <span class="text-xl font-bold ml-1 text-gray-700">日</span>
+                        </div>
+                        <div id="achievementTimeContainer" class="flex items-baseline">
+                            <span id="achievementHoursRemaining" class="text-4xl font-bold tabular-nums"></span><span class="text-lg mx-1 font-bold text-gray-700">時間</span>
+                            <span id="achievementMinutesRemaining" class="text-4xl font-bold tabular-nums"></span><span class="text-lg mx-1 font-bold text-gray-700">分</span>
+                            <span id="achievementSecondsRemaining" class="text-4xl font-bold tabular-nums"></span><span class="text-lg ml-1 font-bold text-gray-700">秒</span>
+                        </div>
                     </div>
-                    <p class="text-amber-800 text-sm" id="achievementMessageDisplay"></p>
+                    <p class="text-amber-800 text-sm mt-2" id="achievementMessageDisplay"></p>
                 </div>
             </div>
         </div>
@@ -96,7 +105,13 @@
             const achievementResultArea = document.getElementById('achievementResultArea');
             const achievementTargetDisplay = document.getElementById('achievementTargetDisplay');
             const achievementDaysRemaining = document.getElementById('achievementDaysRemaining');
+            const achievementHoursRemaining = document.getElementById('achievementHoursRemaining');
+            const achievementMinutesRemaining = document.getElementById('achievementMinutesRemaining');
+            const achievementSecondsRemaining = document.getElementById('achievementSecondsRemaining');
+            const achievementTimeContainer = document.getElementById('achievementTimeContainer');
             const achievementMessageDisplay = document.getElementById('achievementMessageDisplay');
+
+            let countdownTimer = null;
 
             calculateBtn.addEventListener('click', () => {
                 // UIリセット
@@ -104,6 +119,10 @@
                 errorMsg.textContent = '';
                 resultArea.classList.add('hidden');
                 achievementResultArea.classList.add('hidden');
+
+                if (countdownTimer) {
+                    clearInterval(countdownTimer);
+                }
 
                 // 入力値の取得
                 const inputVal = enrollmentYearInput.value;
@@ -159,48 +178,83 @@
                     // 時間を0時に正規化
                     achTargetDate.setHours(0, 0, 0, 0);
                     
-                    const achDiffTime = achTargetDate.getTime() - todayMidnight.getTime();
-                    const achDiffDays = Math.ceil(achDiffTime / (1000 * 60 * 60 * 24));
-                    
                     const achYear = achTargetDate.getFullYear();
                     const achMonth = achTargetDate.getMonth() + 1;
                     const achDate = achTargetDate.getDate();
                     
                     achievementTargetDisplay.textContent = `到達度試験: ${achYear}年${achMonth}月${achDate}日`;
                     
-                    let areaBgClass = "";
-                    let textClass = "";
+                    const updateAchievementCountdown = () => {
+                        const now = new Date();
+                        const diffTime = achTargetDate.getTime() - now.getTime();
+                        
+                        let areaBgClass = "";
+                        let textClass = "";
+                        let mainColorClass = "";
 
-                    if (achDiffDays > 14) {
-                        achievementDaysRemaining.textContent = achDiffDays;
-                        achievementMessageDisplay.textContent = '試験に向けて計画的に学習を進めましょう！';
-                        achievementDaysRemaining.className = "text-amber-600 text-5xl";
-                        areaBgClass = "bg-amber-50 border-amber-200";
-                        textClass = "text-amber-800";
-                    } else if (achDiffDays > 0 && achDiffDays <= 14) {
-                        achievementDaysRemaining.textContent = achDiffDays;
-                        achievementMessageDisplay.textContent = '試験まで2週間を切りました！ラストスパートです！';
-                        achievementDaysRemaining.className = "text-red-600 text-5xl font-bold";
-                        areaBgClass = "bg-red-50 border-red-200"; // 薄い赤背景
-                        textClass = "text-red-800"; // 濃い赤文字で読みやすく
-                    } else if (achDiffDays === 0) {
-                        achievementDaysRemaining.textContent = "0";
-                        achievementMessageDisplay.textContent = '今日が到達度試験当日です！落ち着いて頑張ってください！';
-                        achievementDaysRemaining.className = "text-green-600 text-5xl";
-                        areaBgClass = "bg-green-50 border-green-200";
-                        textClass = "text-green-800";
-                    } else {
-                        achievementDaysRemaining.textContent = Math.abs(achDiffDays);
-                        achievementMessageDisplay.textContent = '試験は終了しました。お疲れ様でした！';
-                        achievementDaysRemaining.className = "text-gray-500 text-5xl";
-                        areaBgClass = "bg-gray-50 border-gray-200";
-                        textClass = "text-gray-600";
-                    }
+                        if (diffTime > 0) {
+                            achievementTimeContainer.classList.remove('hidden');
+                            
+                            const d = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                            const h = Math.floor((diffTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                            const m = Math.floor((diffTime % (1000 * 60 * 60)) / (1000 * 60));
+                            const s = Math.floor((diffTime % (1000 * 60)) / 1000);
+                            
+                            achievementDaysRemaining.textContent = d;
+                            achievementHoursRemaining.textContent = String(h).padStart(2, '0');
+                            achievementMinutesRemaining.textContent = String(m).padStart(2, '0');
+                            achievementSecondsRemaining.textContent = String(s).padStart(2, '0');
+                            
+                            if (d > 14) {
+                                achievementMessageDisplay.textContent = '試験に向けて計画的に学習を進めましょう！';
+                                mainColorClass = "text-amber-600";
+                                areaBgClass = "bg-amber-50 border-amber-200";
+                                textClass = "text-amber-800";
+                            } else {
+                                achievementMessageDisplay.textContent = '試験まで2週間を切りました！ラストスパートです！';
+                                mainColorClass = "text-red-600 font-bold";
+                                areaBgClass = "bg-red-50 border-red-200";
+                                textClass = "text-red-800";
+                            }
+                        } else {
+                            // 当日または過ぎている場合
+                            achievementTimeContainer.classList.add('hidden');
+                            
+                            // 今日を基準に経過日数を計算
+                            const today = new Date();
+                            today.setHours(0, 0, 0, 0);
+                            const achDiffDays = Math.ceil((achTargetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                            
+                            if (achDiffDays === 0) {
+                                achievementDaysRemaining.textContent = "0";
+                                achievementMessageDisplay.textContent = '今日が到達度試験当日です！落ち着いて頑張ってください！';
+                                mainColorClass = "text-green-600";
+                                areaBgClass = "bg-green-50 border-green-200";
+                                textClass = "text-green-800";
+                            } else {
+                                achievementDaysRemaining.textContent = Math.abs(achDiffDays);
+                                achievementMessageDisplay.textContent = '試験は終了しました。お疲れ様でした！';
+                                mainColorClass = "text-gray-500";
+                                areaBgClass = "bg-gray-50 border-gray-200";
+                                textClass = "text-gray-600";
+                            }
+                            
+                            if (countdownTimer) clearInterval(countdownTimer);
+                        }
+                        
+                        // クラスの適用 (時間・分・秒の表示色も同期、等幅フォント設定を追加)
+                        achievementDaysRemaining.className = `text-5xl font-bold tabular-nums ${mainColorClass}`;
+                        achievementHoursRemaining.className = `text-4xl font-bold tabular-nums ${mainColorClass}`;
+                        achievementMinutesRemaining.className = `text-4xl font-bold tabular-nums ${mainColorClass}`;
+                        achievementSecondsRemaining.className = `text-4xl font-bold tabular-nums ${mainColorClass}`;
+                        
+                        achievementTargetDisplay.className = `text-sm mb-1 ${textClass}`;
+                        achievementMessageDisplay.className = `text-sm mt-2 ${textClass}`;
+                        achievementResultArea.className = `p-4 border rounded-md text-center ${areaBgClass}`;
+                    };
 
-                    // 背景色と文字色を動的に適用
-                    achievementTargetDisplay.className = `text-sm mb-1 ${textClass}`;
-                    achievementMessageDisplay.className = `text-sm ${textClass}`;
-                    achievementResultArea.className = `p-4 border rounded-md text-center ${areaBgClass}`;
+                    updateAchievementCountdown(); // 初回実行
+                    countdownTimer = setInterval(updateAchievementCountdown, 1000); // 1秒ごとに更新
                     
                     achievementResultArea.classList.remove('hidden');
                 }
