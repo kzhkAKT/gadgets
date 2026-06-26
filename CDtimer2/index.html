@@ -38,7 +38,7 @@
 
             <div class="mb-6">
                 <label for="achievementTestDate" class="block text-sm font-medium text-gray-700 mb-1">
-                    到達度試験の日程（任意）
+                    到達度試験の初日（任意）
                 </label>
                 <input 
                     type="date" 
@@ -182,7 +182,7 @@
                     const achMonth = achTargetDate.getMonth() + 1;
                     const achDate = achTargetDate.getDate();
                     
-                    achievementTargetDisplay.textContent = `到達度試験: ${achYear}年${achMonth}月${achDate}日`;
+                    achievementTargetDisplay.textContent = `到達度試験 初日: ${achYear}年${achMonth}月${achDate}日`;
                     
                     const updateAchievementCountdown = () => {
                         const now = new Date();
@@ -206,12 +206,12 @@
                             achievementSecondsRemaining.textContent = String(s).padStart(2, '0');
                             
                             if (d > 14) {
-                                achievementMessageDisplay.textContent = '試験に向けて計画的に学習を進めましょう！';
+                                achievementMessageDisplay.textContent = '試験初日に向けて計画的に学習を進めましょう！';
                                 mainColorClass = "text-amber-600";
                                 areaBgClass = "bg-amber-50 border-amber-200";
                                 textClass = "text-amber-800";
                             } else {
-                                achievementMessageDisplay.textContent = '試験まで2週間を切りました！ラストスパートです！';
+                                achievementMessageDisplay.textContent = '試験初日まで2週間を切りました！ラストスパートです！';
                                 mainColorClass = "text-red-600 font-bold";
                                 areaBgClass = "bg-red-50 border-red-200";
                                 textClass = "text-red-800";
@@ -227,13 +227,13 @@
                             
                             if (achDiffDays === 0) {
                                 achievementDaysRemaining.textContent = "0";
-                                achievementMessageDisplay.textContent = '今日が到達度試験当日です！落ち着いて頑張ってください！';
+                                achievementMessageDisplay.textContent = '今日が到達度試験の初日です！落ち着いて頑張ってください！';
                                 mainColorClass = "text-green-600";
                                 areaBgClass = "bg-green-50 border-green-200";
                                 textClass = "text-green-800";
                             } else {
                                 achievementDaysRemaining.textContent = Math.abs(achDiffDays);
-                                achievementMessageDisplay.textContent = '試験は終了しました。お疲れ様でした！';
+                                achievementMessageDisplay.textContent = '初日の日程は過ぎました。お疲れ様でした！';
                                 mainColorClass = "text-gray-500";
                                 areaBgClass = "bg-gray-50 border-gray-200";
                                 textClass = "text-gray-600";
